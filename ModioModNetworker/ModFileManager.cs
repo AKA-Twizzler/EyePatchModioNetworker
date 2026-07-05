@@ -116,8 +116,6 @@ public class ModFileManager
 
 	public static void CheckQueue()
 	{
-		//IL_003a: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0040: Invalid comparison between Unknown and I4
 		if (isDownloading || AssetWarehouse.Instance == null || SceneStreamer._session == null || (int)SceneStreamer._session.Status == 1 || queue.Count <= 0)
 		{
 			return;
@@ -207,7 +205,7 @@ public class ModFileManager
 		return true;
 	}
 
-	public static async void DownloadFileHttpClient(string url, string path)
+	public static async System.Threading.Tasks.Task DownloadFileHttpClient(string url, string path)
 	{
 		using HttpClient client = new HttpClient(new HttpClientHandler
 		{
@@ -243,7 +241,7 @@ public class ModFileManager
 
 	public static async Task DownloadFileAsync(string url, string path)
 	{
-		DownloadFileHttpClient(url, path);
+		await DownloadFileHttpClient(url, path);
 	}
 
 	public static void DownloadFile(string url, string path)
@@ -401,8 +399,6 @@ public class ModFileManager
 
 	private static void UnloadPallet(string palletBarcode)
 	{
-		//IL_000f: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0019: Expected O, but got Unknown
 		DeleteExistingModObjects(palletBarcode);
 		try
 		{
@@ -496,10 +492,6 @@ public class ModFileManager
 		UnityWebRequestAsyncOperation val = httpWebRequest.SendWebRequest();
 		((AsyncOperation)val).m_completeCallback = ((AsyncOperation)val).m_completeCallback + new Action<AsyncOperation>(delegate
 		{
-			//IL_0007: Unknown result type (might be due to invalid IL or missing references)
-			//IL_000d: Invalid comparison between Unknown and I4
-			//IL_0015: Unknown result type (might be due to invalid IL or missing references)
-			//IL_001b: Invalid comparison between Unknown and I4
 			if ((int)httpWebRequest.result == 2 || (int)httpWebRequest.result == 3)
 			{
 				Debug.LogError(httpWebRequest.error);
@@ -527,10 +519,6 @@ public class ModFileManager
 			UnityWebRequestAsyncOperation val = httpWebRequest.SendWebRequest();
 		((AsyncOperation)val).m_completeCallback = ((AsyncOperation)val).m_completeCallback + new Action<AsyncOperation>(delegate
 		{
-			//IL_0033: Unknown result type (might be due to invalid IL or missing references)
-			//IL_0039: Invalid comparison between Unknown and I4
-			//IL_0041: Unknown result type (might be due to invalid IL or missing references)
-			//IL_0047: Invalid comparison between Unknown and I4
 			json = httpWebRequest.downloadHandler.text;
 			dynamic val2 = JsonConvert.DeserializeObject<object>(json);
 			if ((int)httpWebRequest.result == 2 || (int)httpWebRequest.result == 3)

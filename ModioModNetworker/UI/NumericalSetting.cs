@@ -36,9 +36,6 @@ public class NumericalSetting : GenericSetting
 
 	public override void SpawnPrefab(Transform parent)
 	{
-		//IL_00d1: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00e2: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00f3: Unknown result type (might be due to invalid IL or missing references)
 		GameObject val = UnityEngine.Object.Instantiate<GameObject>(prefabObject);
 		increaseButton = ((Component)val.transform.Find("IncreaseArrow").Find("Button")).GetComponent<Button>();
 		decreaseButton = ((Component)val.transform.Find("DecreaseArrow").Find("Button")).GetComponent<Button>();

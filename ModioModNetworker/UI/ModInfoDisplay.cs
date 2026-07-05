@@ -1,4 +1,5 @@
 using System;
+using Il2CppInterop.Runtime.Attributes;
 using Il2CppTMPro;
 using MelonLoader;
 using ModioModNetworker.Data;

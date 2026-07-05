@@ -9,17 +9,11 @@ using ModioModNetworker.Data;
 
 namespace ModioModNetworker.Patches;
 
-[HarmonyPatch(typeof(ModIODownloader), "EnqueueDownload")]
+[HarmonyPatch(typeof(ModIODownloader), "EnqueueDownload", new Type[] { typeof(ModTransaction) })]
 public class ModIoDownloaderEnqueuePatch
 {
 	public static bool Prefix(ModTransaction transaction)
 	{
-		//IL_000f: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0014: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0104: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0109: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00b3: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00bd: Expected O, but got Unknown
 		if (MainClass.overrideFusionDL)
 		{
 			ModIOFile modFile = transaction.ModFile;

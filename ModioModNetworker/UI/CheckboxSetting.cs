@@ -25,9 +25,6 @@ public class CheckboxSetting : GenericSetting
 
 	public override void SpawnPrefab(Transform parent)
 	{
-		//IL_0080: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0091: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00a2: Unknown result type (might be due to invalid IL or missing references)
 		GameObject val = UnityEngine.Object.Instantiate<GameObject>(prefabObject);
 		checkBox = ((Component)val.transform.Find("Button")).GetComponent<Button>();
 		checkBox.onClick.AddListener(new System.Action(() => OnCheckMarkClicked()));

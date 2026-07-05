@@ -35,7 +35,6 @@ public class AvatarDownloadBar
 
 	public AvatarDownloadBar(NetworkPlayer rep)
 	{
-		//IL_0150: Unknown result type (might be due to invalid IL or missing references)
 		GameObject val = UnityEngine.Object.Instantiate<GameObject>(NetworkerAssets.avatarDownloadBarPrefab);
 		UnityEngine.Object.DontDestroyOnLoad((UnityEngine.Object)(object)val);
 		((UnityEngine.Object)val).hideFlags = (HideFlags)32;
@@ -69,14 +68,6 @@ public class AvatarDownloadBar
 
 	public void Update()
 	{
-		//IL_002e: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0033: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0044: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0049: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0064: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0074: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0079: Unknown result type (might be due to invalid IL or missing references)
-		//IL_007e: Unknown result type (might be due to invalid IL or missing references)
 		if (manager != null)
 		{
 			Transform head = ((Rig)manager.physicsRig).m_head;
@@ -98,7 +89,6 @@ public class AvatarDownloadBar
 
 	public void SetPercentage(float percentage)
 	{
-		//IL_0070: Unknown result type (might be due to invalid IL or missing references)
 		if (!previouslyStarted)
 		{
 			Show();

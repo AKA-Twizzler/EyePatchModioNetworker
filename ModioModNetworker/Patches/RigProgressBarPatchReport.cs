@@ -3,7 +3,7 @@ using LabFusion.Entities;
 
 namespace ModioModNetworker.Patches;
 
-[HarmonyPatch(/*Could not decode attribute arguments.*/)]
+[HarmonyPatch(typeof(RigProgressBar), "set_Visible")]
 public class RigProgressBarPatchReport
 {
 	public static void Prefix(RigProgressBar __instance, ref bool value)

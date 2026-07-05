@@ -132,14 +132,6 @@ public class ModInfo
 
 	public ModListing ToModListing()
 	{
-		//IL_0001: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0007: Expected O, but got Unknown
-		//IL_0049: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0053: Expected O, but got Unknown
-		//IL_0054: Unknown result type (might be due to invalid IL or missing references)
-		//IL_005a: Expected O, but got Unknown
-		//IL_00dc: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00e2: Expected O, but got Unknown
 		ModListing val = new ModListing();
 		try
 		{

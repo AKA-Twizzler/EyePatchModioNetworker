@@ -14,8 +14,6 @@ public class SpawnableResponsePatch
 	{
 		public static bool Prefix(ReceivedMessage received)
 		{
-			//IL_003b: Unknown result type (might be due to invalid IL or missing references)
-			//IL_0045: Expected O, but got Unknown
 			if (!received.IsServerHandled && MainClass.autoDownloadSpawnables)
 			{
 				SpawnResponseData val = received.ReadData<SpawnResponseData>();

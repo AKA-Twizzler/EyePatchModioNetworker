@@ -19,7 +19,6 @@ public class PooleeSpawnPatch
 	{
 		public static void Prefix(Poolee __instance)
 		{
-			//IL_0045: Unknown result type (might be due to invalid IL or missing references)
 			if (!MainClass.confirmedHostHasIt || !NetworkInfo.HasServer)
 			{
 				return;
@@ -51,8 +50,9 @@ public class PooleeSpawnPatch
 					((IDisposable)val)?.Dispose();
 				}
 			}
-			catch (Exception)
+			catch (Exception ex)
 			{
+				MelonLoader.MelonLogger.Error("PooleeSpawnPatch error: " + ex.Message);
 			}
 		}
 	}
@@ -70,7 +70,6 @@ public class PooleeSpawnPatch
 	{
 		public static void Prefix(byte ownerID, string barcode, ushort entityID, SerializedTransform serializedTransform, byte playerID, EntitySource source)
 		{
-			//IL_003a: Unknown result type (might be due to invalid IL or missing references)
 			if (!NetworkInfo.IsHost)
 			{
 				return;

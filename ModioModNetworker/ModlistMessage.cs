@@ -19,9 +19,6 @@ public class ModlistMessage : ModuleMessageHandler
 
 	protected override void OnHandleMessage(ReceivedMessage message)
 	{
-		//IL_0037: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0142: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0148: Invalid comparison between Unknown and I4
 		ModlistData modlistData = message.ReadData<ModlistData>();
 		if (NetworkInfo.IsHost && message.IsServerHandled)
 		{

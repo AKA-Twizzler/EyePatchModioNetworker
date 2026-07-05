@@ -59,14 +59,6 @@ public class SpawnableHoldQueue
 
 	private static void Handle(SpawnResponseData data)
 	{
-		//IL_001e: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0024: Expected O, but got Unknown
-		//IL_0024: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0029: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0031: Unknown result type (might be due to invalid IL or missing references)
-		//IL_003a: Expected O, but got Unknown
-		//IL_0052: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0067: Unknown result type (might be due to invalid IL or missing references)
 		SpawnableCrateReference crateRef = new SpawnableCrateReference(data.SpawnData.Barcode);
 		Spawnable val = new Spawnable
 		{

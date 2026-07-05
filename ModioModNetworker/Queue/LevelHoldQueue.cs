@@ -37,15 +37,6 @@ public class LevelHoldQueue
 
 	public static void SetQueue(LevelHoldQueueData data)
 	{
-		//IL_0001: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0006: Unknown result type (might be due to invalid IL or missing references)
-		//IL_001c: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0027: Unknown result type (might be due to invalid IL or missing references)
-		//IL_002d: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0038: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0044: Unknown result type (might be due to invalid IL or missing references)
-		//IL_004c: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0059: Expected O, but got Unknown
 		Notifier.Send(new Notification
 		{
 			Title = new NotificationText("The host tried loading a level you dont have. \"" + data.missingBarcode + "\""),
@@ -69,12 +60,6 @@ public class LevelHoldQueue
 
 	public static void Update()
 	{
-		//IL_001d: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0023: Invalid comparison between Unknown and I4
-		//IL_0057: Unknown result type (might be due to invalid IL or missing references)
-		//IL_005d: Invalid comparison between Unknown and I4
-		//IL_00af: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00b5: Invalid comparison between Unknown and I4
 		if (waitingForLevel && SceneStreamer._session != null && (int)SceneStreamer._session.Status == 1)
 		{
 			waitingForLevelToLoad = true;

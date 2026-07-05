@@ -28,8 +28,6 @@ public class ThumbnailThreader
 			{
 				callback = delegate
 				{
-					//IL_0007: Unknown result type (might be due to invalid IL or missing references)
-					//IL_000d: Invalid comparison between Unknown and I4
 					if ((int)webRequest.result == 1)
 					{
 						DownloadHandlerTexture val2 = ((Il2CppObjectBase)webRequest.downloadHandler).Cast<DownloadHandlerTexture>();

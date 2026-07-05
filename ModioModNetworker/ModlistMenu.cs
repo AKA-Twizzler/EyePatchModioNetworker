@@ -16,9 +16,6 @@ public class ModlistMenu
 	{
 		public static void Postfix(GUIMenu __instance, Page page)
 		{
-			//IL_0066: Unknown result type (might be due to invalid IL or missing references)
-			//IL_0077: Unknown result type (might be due to invalid IL or missing references)
-			//IL_0088: Unknown result type (might be due to invalid IL or missing references)
 			if (page == mainCategory)
 			{
 				if (!customMenuObject != null)
@@ -66,7 +63,6 @@ public class ModlistMenu
 
 	public static void Initialize()
 	{
-		//IL_000b: Unknown result type (might be due to invalid IL or missing references)
 		mainCategory = Page.Root.CreatePage("ModIo Mod Networker", Color.cyan, 0, true);
 		NetworkerMenuController.AddCheckboxSetting("Override Fusion DL", MainClass.overrideFusionDL, delegate(bool b)
 		{
@@ -142,18 +138,6 @@ public class ModlistMenu
 
 	private static void CreateSettingsSection()
 	{
-		//IL_0001: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0006: Unknown result type (might be due to invalid IL or missing references)
-		//IL_001b: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0020: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0014: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0019: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0037: Unknown result type (might be due to invalid IL or missing references)
-		//IL_003c: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0030: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0035: Unknown result type (might be due to invalid IL or missing references)
-		//IL_004c: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0051: Unknown result type (might be due to invalid IL or missing references)
 		Color green = Color.green;
 		if (!MainClass.autoDownloadAvatars)
 		{

@@ -17,8 +17,6 @@ public class ModInfoUtilities
 
 	public static ModInfo GetModInfoForLevelBarcode(string barcode)
 	{
-		//IL_0002: Unknown result type (might be due to invalid IL or missing references)
-		//IL_000c: Expected O, but got Unknown
 		LevelCrate crate = CrateFilterer.GetCrate<LevelCrate>(new Barcode(barcode));
 		if ((UnityEngine.Object)(object)crate == (UnityEngine.Object)null)
 		{
@@ -30,8 +28,6 @@ public class ModInfoUtilities
 
 	public static ModInfo GetModInfoForSpawnableBarcode(string barcode)
 	{
-		//IL_0002: Unknown result type (might be due to invalid IL or missing references)
-		//IL_000c: Expected O, but got Unknown
 		GameObjectCrate crate = CrateFilterer.GetCrate<GameObjectCrate>(new Barcode(barcode));
 		if ((UnityEngine.Object)(object)crate == (UnityEngine.Object)null)
 		{

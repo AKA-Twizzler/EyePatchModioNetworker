@@ -1,5 +1,6 @@
 using System;
 using HarmonyLib;
+using Il2CppSLZ.Marrow;
 using Il2CppSLZ.Marrow.Warehouse;
 using LabFusion.Data;
 using LabFusion.Network;
@@ -13,12 +14,11 @@ namespace ModioModNetworker.Patches;
 
 public class AvatarSwitchPatch
 {
-	[HarmonyPatch(typeof(PlayerSender), "SendPlayerAvatar")]
+	[HarmonyPatch(typeof(PlayerSender), "SendPlayerAvatar", new Type[] { typeof(PlayerID), typeof(ulong) })]
 	public static class PlayerSenderPatch
 	{
 		public static void Postfix()
 		{
-			//IL_00f7: Unknown result type (might be due to invalid IL or missing references)
 			if (!NetworkInfo.HasServer || !MainClass.confirmedHostHasIt)
 			{
 				return;

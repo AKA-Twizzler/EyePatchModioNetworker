@@ -21,10 +21,6 @@ public class LevelLoadPatch
 	{
 		public static bool Prefix(ReceivedMessage received)
 		{
-			//IL_0046: Unknown result type (might be due to invalid IL or missing references)
-			//IL_0050: Expected O, but got Unknown
-			//IL_0089: Unknown result type (might be due to invalid IL or missing references)
-			//IL_00a4: Unknown result type (might be due to invalid IL or missing references)
 			if (!NetworkInfo.IsHost && !received.IsServerHandled && MainClass.autoDownloadLevels)
 			{
 				LevelLoadData val = received.ReadData<LevelLoadData>();
@@ -65,7 +61,6 @@ public class LevelLoadPatch
 	{
 		public static void Prefix(string barcode, string loadBarcode, ulong userId)
 		{
-			//IL_003e: Unknown result type (might be due to invalid IL or missing references)
 			if (!NetworkInfo.IsHost)
 			{
 				return;
@@ -106,7 +101,6 @@ public class LevelLoadPatch
 	{
 		public static void Prefix(string barcode, string loadBarcode)
 		{
-			//IL_003e: Unknown result type (might be due to invalid IL or missing references)
 			if (!NetworkInfo.IsHost)
 			{
 				return;

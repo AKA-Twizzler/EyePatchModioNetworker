@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using BoneLib.BoneMenu;
+using Il2CppInterop.Runtime.Attributes;
 using Il2CppTMPro;
 using LabFusion.Network;
 using MelonLoader;
@@ -524,9 +525,6 @@ public class NetworkerMenuController : MonoBehaviour
 
 	public void PopulateBlacklist(int page)
 	{
-		//IL_0166: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0178: Unknown result type (might be due to invalid IL or missing references)
-		//IL_018a: Unknown result type (might be due to invalid IL or missing references)
 		GameObject gameObject = ((Component)filesTab.transform.Find("ListLayout")).gameObject;
 		int childCount = gameObject.transform.childCount;
 		for (int i = 0; i < childCount; i++)
@@ -583,7 +581,6 @@ public class NetworkerMenuController : MonoBehaviour
 
 	private void PopulateModIoTab(int page)
 	{
-		//IL_021b: Unknown result type (might be due to invalid IL or missing references)
 		if (page > 0 || searching)
 		{
 			GameObject gameObject = ((Component)modIoTab.transform.Find("GridLayout")).gameObject;
@@ -710,9 +707,6 @@ public class NetworkerMenuController : MonoBehaviour
 
 	private GameObject MakeModInfoObject(Transform parent, ModInfo modInfo, bool zeroPosition = true)
 	{
-		//IL_0063: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0040: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0051: Unknown result type (might be due to invalid IL or missing references)
 		GameObject val = UnityEngine.Object.Instantiate<GameObject>(NetworkerAssets.modInfoDisplay);
 		ModInfoDisplay modInfoDisplay = val.AddComponent<ModInfoDisplay>();
 		modInfoDisplay.SetModInfo(modInfo);
@@ -729,9 +723,6 @@ public class NetworkerMenuController : MonoBehaviour
 
 	private void PopulateFiles(int page)
 	{
-		//IL_0123: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0135: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0147: Unknown result type (might be due to invalid IL or missing references)
 		GameObject gameObject = ((Component)filesTab.transform.Find("GridLayout")).gameObject;
 		int childCount = gameObject.transform.childCount;
 		for (int i = 0; i < childCount; i++)
@@ -771,9 +762,6 @@ public class NetworkerMenuController : MonoBehaviour
 
 	private void PopulateHostMods(int page)
 	{
-		//IL_00fc: Unknown result type (might be due to invalid IL or missing references)
-		//IL_010e: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0120: Unknown result type (might be due to invalid IL or missing references)
 		GameObject gameObject = ((Component)multiplayerTab.transform.Find("GridLayout")).gameObject;
 		int childCount = gameObject.transform.childCount;
 		for (int i = 0; i < childCount; i++)
@@ -1053,9 +1041,6 @@ public class NetworkerMenuController : MonoBehaviour
 
 	private void Update()
 	{
-		//IL_00c1: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00cc: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00dd: Unknown result type (might be due to invalid IL or missing references)
 		List<StalledAction> toRemove = new List<StalledAction>();
 		foreach (StalledAction stalledAction in stalledActions)
 		{

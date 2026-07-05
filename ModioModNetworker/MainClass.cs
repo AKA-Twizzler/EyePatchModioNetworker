@@ -67,9 +67,9 @@ public class MainClass : MelonMod
 
 	public static bool menuRefreshRequested = false;
 
-	public static string subscriptionThreadString = "";
+	public static volatile string subscriptionThreadString = "";
 
-	public static string trendingThreadString = "";
+	public static volatile string trendingThreadString = "";
 
 	public static bool subsRefreshing = false;
 
@@ -135,12 +135,6 @@ public class MainClass : MelonMod
 
 	public override void OnInitializeMelon()
 	{
-		//IL_027a: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0284: Expected O, but got Unknown
-		//IL_028c: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0296: Expected O, but got Unknown
-		//IL_029e: Unknown result type (might be due to invalid IL or missing references)
-		//IL_02a8: Expected O, but got Unknown
 		melonPreferencesCategory = MelonPreferences.CreateCategory("ModioModNetworker");
 		melonPreferencesCategory.SetFilePath(MelonLoader.Utils.MelonEnvironment.UserDataDirectory + "/ModioModNetworker.cfg");
 		modsDirectory = melonPreferencesCategory.CreateEntry<string>("ModDirectoryPath", Application.persistentDataPath + "/Mods", (string)null, (string)null, false, false, (ValueValidator)null, (string)null);
@@ -217,10 +211,6 @@ public class MainClass : MelonMod
 
 	private void OnLobbyCategoryMade(Page category, INetworkLobby lobby)
 	{
-		//IL_002b: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0070: Unknown result type (might be due to invalid IL or missing references)
-		//IL_007a: Expected O, but got Unknown
-		//IL_008a: Unknown result type (might be due to invalid IL or missing references)
 		string text = default(string);
 		if (lobby.TryGetMetadata("modionetworker", out text))
 		{
@@ -235,26 +225,6 @@ public class MainClass : MelonMod
 		}
 		category.CreateFunction("Download Level", Color.cyan, (Action)delegate
 		{
-			//IL_008a: Unknown result type (might be due to invalid IL or missing references)
-			//IL_008f: Unknown result type (might be due to invalid IL or missing references)
-			//IL_0095: Unknown result type (might be due to invalid IL or missing references)
-			//IL_009b: Unknown result type (might be due to invalid IL or missing references)
-			//IL_00a6: Unknown result type (might be due to invalid IL or missing references)
-			//IL_00ae: Unknown result type (might be due to invalid IL or missing references)
-			//IL_00ba: Unknown result type (might be due to invalid IL or missing references)
-			//IL_00c0: Unknown result type (might be due to invalid IL or missing references)
-			//IL_00cb: Unknown result type (might be due to invalid IL or missing references)
-			//IL_00d8: Expected O, but got Unknown
-			//IL_002b: Unknown result type (might be due to invalid IL or missing references)
-			//IL_0030: Unknown result type (might be due to invalid IL or missing references)
-			//IL_0036: Unknown result type (might be due to invalid IL or missing references)
-			//IL_003c: Unknown result type (might be due to invalid IL or missing references)
-			//IL_0047: Unknown result type (might be due to invalid IL or missing references)
-			//IL_004f: Unknown result type (might be due to invalid IL or missing references)
-			//IL_005b: Unknown result type (might be due to invalid IL or missing references)
-			//IL_0061: Unknown result type (might be due to invalid IL or missing references)
-			//IL_006c: Unknown result type (might be due to invalid IL or missing references)
-			//IL_0079: Expected O, but got Unknown
 			string text3 = default(string);
 			if (lobby.TryGetMetadata("networkermap", out text3))
 			{
@@ -298,25 +268,6 @@ public class MainClass : MelonMod
 
 	public override void OnUpdate()
 	{
-		//IL_00ce: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00d4: Invalid comparison between Unknown and I4
-		//IL_01a0: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01a5: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01ab: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01b1: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01bc: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01c4: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01d5: Expected O, but got Unknown
-		//IL_0385: Unknown result type (might be due to invalid IL or missing references)
-		//IL_038a: Unknown result type (might be due to invalid IL or missing references)
-		//IL_03a1: Unknown result type (might be due to invalid IL or missing references)
-		//IL_03a7: Unknown result type (might be due to invalid IL or missing references)
-		//IL_03b2: Unknown result type (might be due to invalid IL or missing references)
-		//IL_03ba: Unknown result type (might be due to invalid IL or missing references)
-		//IL_03bd: Unknown result type (might be due to invalid IL or missing references)
-		//IL_03c8: Unknown result type (might be due to invalid IL or missing references)
-		//IL_03d4: Unknown result type (might be due to invalid IL or missing references)
-		//IL_03e1: Expected O, but got Unknown
 		foreach (AvatarDownloadBar value3 in AvatarDownloadBar.bars.Values)
 		{
 			value3.Update();
@@ -900,7 +851,6 @@ public class MainClass : MelonMod
 
 	private void SendAllAvatars()
 	{
-		//IL_003d: Unknown result type (might be due to invalid IL or missing references)
 		foreach (KeyValuePair<PlayerID, ModInfo> avatarMod in ModlistMessage.avatarMods)
 		{
 			ModlistData modlistData = ModlistData.Create(avatarMod.Key, avatarMod.Value, ModlistData.ModType.AVATAR);
@@ -927,7 +877,6 @@ public class MainClass : MelonMod
 
 	private void SendAllMods()
 	{
-		//IL_0047: Unknown result type (might be due to invalid IL or missing references)
 		int num = 0;
 		foreach (ModInfo subscribedMod in subscribedMods)
 		{
