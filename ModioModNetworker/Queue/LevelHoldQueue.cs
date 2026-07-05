@@ -1,118 +1,104 @@
-using System.Collections.Generic;
-using LabFusion.Network;
-using LabFusion.Utilities;
-using MelonLoader;
-using Il2CppSLZ.Marrow.Data;
-using Il2CppSLZ.Marrow.Pool;
 using Il2CppSLZ.Marrow.SceneStreaming;
-using Il2CppSLZ.Marrow.Warehouse;
-using UnityEngine;
+using LabFusion.Network;
 using LabFusion.Scene;
 using LabFusion.UI.Popups;
 
-namespace ModioModNetworker.Queue
+namespace ModioModNetworker.Queue;
+
+public class LevelHoldQueue
 {
-    public class LevelHoldQueue
-    {
-        static LevelHoldQueueData queueData;
-        
-        public static bool waitingForLevel = false;
-        public static bool waitingForLevelToLoad = false;
-        public static bool finishedLoadingLevel = false;
-        
-        public static void ClearQueue()
-        {
-            queueData = null;
-            waitingForLevel = false;
-            waitingForLevelToLoad = false;
-            finishedLoadingLevel = false;
-        }
-        
-        public static bool LevelInQueue()
-        {
-            return queueData != null || waitingForLevel || waitingForLevelToLoad || finishedLoadingLevel;
-        }
-        
-        public static void SetQueue(LevelHoldQueueData data)
-        {
-            Notifier.Send(new Notification()
-            {
-                Title = new NotificationText($"The host tried loading a level you dont have. \"{data.missingBarcode}\""),
-                Message = new NotificationText("Wait a bit, it may start downloading!"),
-                PopupLength = 3f,
-                SaveToMenu = false,
-                ShowPopup = true,
-            });
+	public class LevelHoldQueueData
+	{
+		public string missingBarcode;
 
-            queueData = data;
-        }
+		public LevelLoadData _data;
+	}
 
-        public static void CheckValid(string barcode)
-        {
-            if (queueData != null)
-            {
-                if (queueData.missingBarcode == barcode)
-                {
-                    Handle(queueData._data);
-                    waitingForLevel = true;
-                    queueData = null;
-                }
-            }
-        }
+	private static LevelHoldQueueData queueData;
 
-        public static void Update()
-        {
-            if (waitingForLevel)
-            {
-                if (SceneStreamer._session != null)
-                {
-                    if (SceneStreamer._session.Status == StreamStatus.LOADING)
-                    {
-                        waitingForLevelToLoad = true;
-                        waitingForLevel = false;
-                    }
-                }
-            }
+	public static bool waitingForLevel;
 
-            if (waitingForLevelToLoad)
-            {
-                if (SceneStreamer._session != null)
-                {
-                    if (SceneStreamer._session.Status != StreamStatus.LOADING)
-                    {
-                        waitingForLevelToLoad = false;
-                        finishedLoadingLevel = true;
-                    }
-                }
-            }
+	public static bool waitingForLevelToLoad;
 
-            if (finishedLoadingLevel)
-            {
-           
-                SpawnableHoldQueue.HandleAllSpawnResponseDatas();
-                finishedLoadingLevel = false;
-            }
+	public static bool finishedLoadingLevel;
 
-            if (SceneStreamer._session != null && !LevelInQueue())
-            {
-                if (SceneStreamer._session.Status == StreamStatus.DONE)
-                {
-        
-                    SpawnableHoldQueue.ClearSpawnResponseDatas();
-                }
-            }
-        }
+	public static void ClearQueue()
+	{
+		queueData = null;
+		waitingForLevel = false;
+		waitingForLevelToLoad = false;
+		finishedLoadingLevel = false;
+	}
 
-        private static void Handle(LevelLoadData data)
-        {
-            FusionSceneManager.SetTargetScene(data.LevelBarcode, data.LoadingScreenBarcode);
-        }
-        
-        
-        public class LevelHoldQueueData
-        {
-            public string missingBarcode;
-            public LevelLoadData _data;
-        }
-    }
+	public static bool LevelInQueue()
+	{
+		return queueData != null || waitingForLevel || waitingForLevelToLoad || finishedLoadingLevel;
+	}
+
+	public static void SetQueue(LevelHoldQueueData data)
+	{
+		//IL_0001: Unknown result type (might be due to invalid IL or missing references)
+		//IL_0006: Unknown result type (might be due to invalid IL or missing references)
+		//IL_001c: Unknown result type (might be due to invalid IL or missing references)
+		//IL_0027: Unknown result type (might be due to invalid IL or missing references)
+		//IL_002d: Unknown result type (might be due to invalid IL or missing references)
+		//IL_0038: Unknown result type (might be due to invalid IL or missing references)
+		//IL_0044: Unknown result type (might be due to invalid IL or missing references)
+		//IL_004c: Unknown result type (might be due to invalid IL or missing references)
+		//IL_0059: Expected O, but got Unknown
+		Notifier.Send(new Notification
+		{
+			Title = new NotificationText("The host tried loading a level you dont have. \"" + data.missingBarcode + "\""),
+			Message = new NotificationText("Wait a bit, it may start downloading!"),
+			PopupLength = 3f,
+			SaveToMenu = false,
+			ShowPopup = true
+		});
+		queueData = data;
+	}
+
+	public static void CheckValid(string barcode)
+	{
+		if (queueData != null && queueData.missingBarcode == barcode)
+		{
+			Handle(queueData._data);
+			waitingForLevel = true;
+			queueData = null;
+		}
+	}
+
+	public static void Update()
+	{
+		//IL_001d: Unknown result type (might be due to invalid IL or missing references)
+		//IL_0023: Invalid comparison between Unknown and I4
+		//IL_0057: Unknown result type (might be due to invalid IL or missing references)
+		//IL_005d: Invalid comparison between Unknown and I4
+		//IL_00af: Unknown result type (might be due to invalid IL or missing references)
+		//IL_00b5: Invalid comparison between Unknown and I4
+		if (waitingForLevel && SceneStreamer._session != null && (int)SceneStreamer._session.Status == 1)
+		{
+			waitingForLevelToLoad = true;
+			waitingForLevel = false;
+		}
+		if (waitingForLevelToLoad && SceneStreamer._session != null && (int)SceneStreamer._session.Status != 1)
+		{
+			waitingForLevelToLoad = false;
+			finishedLoadingLevel = true;
+		}
+		if (finishedLoadingLevel)
+		{
+			SpawnableHoldQueue.HandleAllSpawnResponseDatas();
+			finishedLoadingLevel = false;
+		}
+		if (SceneStreamer._session != null && !LevelInQueue() && (int)SceneStreamer._session.Status == 2)
+		{
+			SpawnableHoldQueue.ClearSpawnResponseDatas();
+		}
+	}
+
+	private static void Handle(LevelLoadData data)
+	{
+		FusionSceneManager.SetTargetScene(data.LevelBarcode, data.LoadingScreenBarcode);
+		NetworkSceneManager.Purgatory = false;
+	}
 }

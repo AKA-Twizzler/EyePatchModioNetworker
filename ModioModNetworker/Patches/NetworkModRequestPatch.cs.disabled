@@ -1,0 +1,16 @@
+using HarmonyLib;
+using LabFusion.RPC;
+
+namespace ModioModNetworker.Patches;
+
+[HarmonyPatch(typeof(NetworkModRequester), "RequestAndInstallMod")]
+public class NetworkModRequestPatch
+{
+	public static void Prefix(ModInstallInfo installInfo)
+	{
+		if (MainClass.overrideFusionDL)
+		{
+			installInfo.BeginDownloadCallback = null;
+		}
+	}
+}

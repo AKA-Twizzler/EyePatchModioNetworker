@@ -1,69 +1,69 @@
-﻿using ModioModNetworker.Utilities;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Il2CppTMPro;
+using ModioModNetworker.Utilities;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.UI;
 
-namespace ModioModNetworker.UI
+namespace ModioModNetworker.UI;
+
+public class CheckboxSetting : GenericSetting
 {
-    public class CheckboxSetting : GenericSetting
-    {
-        public CheckboxSetting(string title, bool startingValue, Action<bool> onChecked = null)
-        {
-            prefabObject = NetworkerAssets.checkboxSettingPrefab;
-            this.title = title;
-            value = startingValue;
-            this.onChecked = onChecked;
-        }
+	private Button checkBox;
 
-        Button checkBox;
-        public bool value;
-        public Action<bool> onChecked;
+	public bool value;
 
+	public Action<bool> onChecked;
 
-        public override void SpawnPrefab(Transform parent) {
-            GameObject spawnedElement = GameObject.Instantiate(prefabObject);
-            checkBox = spawnedElement.transform.Find("Button").GetComponent<Button>();
-            checkBox.onClick.AddListener(new Action(() => {
-                OnCheckMarkClicked();
-            }));
-            TMP_Text titleText = spawnedElement.transform.Find("Title").GetComponent<TMP_Text>();
-            titleText.text = title;
+	public CheckboxSetting(string title, bool startingValue, Action<bool> onChecked = null)
+	{
+		prefabObject = NetworkerAssets.checkboxSettingPrefab;
+		base.title = title;
+		value = startingValue;
+		this.onChecked = onChecked;
+	}
 
-            spawnedElement.transform.parent = parent;
-            spawnedElement.transform.localPosition = Vector3.forward;
-            spawnedElement.transform.localRotation = Quaternion.identity;
-            spawnedElement.transform.localScale = Vector3.one;
+	public override void SpawnPrefab(Transform parent)
+	{
+		//IL_0080: Unknown result type (might be due to invalid IL or missing references)
+		//IL_0091: Unknown result type (might be due to invalid IL or missing references)
+		//IL_00a2: Unknown result type (might be due to invalid IL or missing references)
+		GameObject val = UnityEngine.Object.Instantiate<GameObject>(prefabObject);
+		checkBox = ((Component)val.transform.Find("Button")).GetComponent<Button>();
+		checkBox.onClick.AddListener(new System.Action(() => OnCheckMarkClicked()));
+		TMP_Text component = ((Component)val.transform.Find("Title")).GetComponent<TMP_Text>();
+		component.text = title;
+		val.transform.parent = parent;
+		val.transform.localPosition = Vector3.forward;
+		val.transform.localRotation = Quaternion.identity;
+		val.transform.localScale = Vector3.one;
+		spawnedObject = val;
+		UpdateDisplay();
+	}
 
-            spawnedObject = spawnedElement;
-            UpdateDisplay();
-        }
+	private void OnCheckMarkClicked()
+	{
+		value = !value;
+		UpdateDisplay();
+		if (onChecked != null)
+		{
+			onChecked(value);
+		}
+	}
 
-        private void OnCheckMarkClicked() {
-            value = !value;
-            UpdateDisplay();
-            if (onChecked != null) {
-                onChecked.Invoke(value);
-            }
-        }
-
-        private void UpdateDisplay() {
-            GameObject unCheckedImage = spawnedObject.transform.Find("UnCheckedImage").gameObject;
-            GameObject checkedImage = spawnedObject.transform.Find("CheckedImage").gameObject;
-
-            if (value)
-            {
-                unCheckedImage.SetActive(false);
-                checkedImage.SetActive(true);
-            }
-            else { 
-                unCheckedImage.SetActive(true);
-                checkedImage.SetActive(false);
-            }
-        }
-    }
+	private void UpdateDisplay()
+	{
+		GameObject gameObject = ((Component)spawnedObject.transform.Find("UnCheckedImage")).gameObject;
+		GameObject gameObject2 = ((Component)spawnedObject.transform.Find("CheckedImage")).gameObject;
+		if (value)
+		{
+			gameObject.SetActive(false);
+			gameObject2.SetActive(true);
+		}
+		else
+		{
+			gameObject.SetActive(true);
+			gameObject2.SetActive(false);
+		}
+	}
 }

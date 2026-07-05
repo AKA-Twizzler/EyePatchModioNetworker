@@ -1,74 +1,104 @@
+using System;
 using HarmonyLib;
-using LabFusion.Data;
-using LabFusion.Network;
-using LabFusion.Representation;
-using LabFusion.Senders;
-using MelonLoader;
-using ModioModNetworker.Data;
-using ModioModNetworker.Utilities;
-using Il2CppSLZ;
 using Il2CppSLZ.Marrow.Pool;
-using LabFusion.Player;
-using LabFusion.Network.Serialization;
+using LabFusion.Data;
 using LabFusion.Entities;
+using LabFusion.Network;
+using LabFusion.Network.Serialization;
+using LabFusion.Player;
+using LabFusion.Senders;
+using ModInfo = ModioModNetworker.Data.ModInfo;
+using ModioModNetworker.Utilities;
 
-namespace ModioModNetworker.Patches
+namespace ModioModNetworker.Patches;
+
+public class PooleeSpawnPatch
 {
-    public class PooleeSpawnPatch
-    {
-        [HarmonyPatch(typeof(Poolee), "OnSpawn")]
-        private static class SpawnPatchClass {
-            
-            public static void Prefix(Poolee __instance)
-            {
-                if (MainClass.confirmedHostHasIt && NetworkInfo.HasServer)
-                {
-                    try
-                    {
-                        Data.ModInfo installedModInfo = ModInfoUtilities.GetModInfoForPoolee(__instance);
-                        if (installedModInfo != null)
-                        {
-                            using (var writer = NetWriter.Create())
-                            {
-                                var data = ModlistData.Create(PlayerIDManager.LocalID, installedModInfo, ModlistData.ModType.SPAWNABLE);
-                                data.Serialize(writer);
-                                using (var message = NetMessage.ModuleCreate<ModlistMessage>(writer, CommonMessageRoutes.ReliableToClients))
-                                {
-                                    MessageSender.BroadcastMessageExceptSelf(NetworkChannel.Reliable, message);
-                                }
-                            }
-                        }
-                    }
-                    catch (Exception e) {
-                        // Ignore
-                    }
-                }
-            }
-        }
+	[HarmonyPatch(typeof(Poolee), "OnSpawn")]
+	private static class SpawnPatchClass
+	{
+		public static void Prefix(Poolee __instance)
+		{
+			//IL_0045: Unknown result type (might be due to invalid IL or missing references)
+			if (!MainClass.confirmedHostHasIt || !NetworkInfo.HasServer)
+			{
+				return;
+			}
+			try
+			{
+				ModInfo modInfoForPoolee = ModInfoUtilities.GetModInfoForPoolee(__instance);
+				if (modInfoForPoolee == null)
+				{
+					return;
+				}
+				NetWriter val = NetWriter.Create();
+				try
+				{
+					ModlistData modlistData = ModlistData.Create(PlayerIDManager.LocalID, modInfoForPoolee, ModlistData.ModType.SPAWNABLE);
+					modlistData.Serialize((INetSerializer)(object)val);
+					NetMessage val2 = NetMessage.ModuleCreate<ModlistMessage>(val, CommonMessageRoutes.ReliableToClients, (byte?)null);
+					try
+					{
+						MessageSender.BroadcastMessageExceptSelf((NetworkChannel)0, val2);
+					}
+					finally
+					{
+						((IDisposable)val2)?.Dispose();
+					}
+				}
+				finally
+				{
+					((IDisposable)val)?.Dispose();
+				}
+			}
+			catch (Exception)
+			{
+			}
+		}
+	}
 
-        // Also patch the catchup spawn
-        [HarmonyPatch(typeof(SpawnSender), nameof(SpawnSender.SendCatchupSpawn), typeof(byte), typeof(string), typeof(ushort), typeof(SerializedTransform), typeof(byte), typeof(EntitySource))]
-        private static class CatchupSpawnPatch
-        {
-            public static void Prefix(byte ownerID, string barcode, ushort entityID, SerializedTransform serializedTransform, byte playerID, EntitySource source)
-            {
-                if (NetworkInfo.IsHost)
-                {
-                    Data.ModInfo installedModInfo = ModInfoUtilities.GetModInfoForSpawnableBarcode(barcode);
-                    if (installedModInfo != null)
-                    {
-                        using (var writer = NetWriter.Create())
-                        {
-                            var data = ModlistData.Create(PlayerIDManager.LocalID, installedModInfo, ModlistData.ModType.SPAWNABLE);
-                            data.Serialize(writer);
-                            using (var message = NetMessage.ModuleCreate<ModlistMessage>(writer, CommonMessageRoutes.ReliableToClients))
-                            {
-                                MessageSender.BroadcastMessageExceptSelf(NetworkChannel.Reliable, message);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+	[HarmonyPatch(typeof(SpawnSender), "SendCatchupSpawn", new Type[]
+	{
+		typeof(byte),
+		typeof(string),
+		typeof(ushort),
+		typeof(SerializedTransform),
+		typeof(byte),
+		typeof(EntitySource)
+	})]
+	private static class CatchupSpawnPatch
+	{
+		public static void Prefix(byte ownerID, string barcode, ushort entityID, SerializedTransform serializedTransform, byte playerID, EntitySource source)
+		{
+			//IL_003a: Unknown result type (might be due to invalid IL or missing references)
+			if (!NetworkInfo.IsHost)
+			{
+				return;
+			}
+			ModInfo modInfoForSpawnableBarcode = ModInfoUtilities.GetModInfoForSpawnableBarcode(barcode);
+			if (modInfoForSpawnableBarcode == null)
+			{
+				return;
+			}
+			NetWriter val = NetWriter.Create();
+			try
+			{
+				ModlistData modlistData = ModlistData.Create(PlayerIDManager.LocalID, modInfoForSpawnableBarcode, ModlistData.ModType.SPAWNABLE);
+				modlistData.Serialize((INetSerializer)(object)val);
+				NetMessage val2 = NetMessage.ModuleCreate<ModlistMessage>(val, CommonMessageRoutes.ReliableToClients, (byte?)null);
+				try
+				{
+					MessageSender.BroadcastMessageExceptSelf((NetworkChannel)0, val2);
+				}
+				finally
+				{
+					((IDisposable)val2)?.Dispose();
+				}
+			}
+			finally
+			{
+				((IDisposable)val)?.Dispose();
+			}
+		}
+	}
 }

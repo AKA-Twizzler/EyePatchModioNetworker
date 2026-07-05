@@ -1,106 +1,140 @@
+using System;
 using HarmonyLib;
+using Il2CppSLZ.Marrow.Warehouse;
+using LabFusion.Marrow;
 using LabFusion.Network;
-using LabFusion.Representation;
+using LabFusion.Scene;
+using LabFusion.Network.Serialization;
+using LabFusion.Player;
+using LabFusion.Scene;
 using LabFusion.Senders;
-using LabFusion.Utilities;
-using MelonLoader;
 using ModioModNetworker.Data;
 using ModioModNetworker.Queue;
 using ModioModNetworker.Utilities;
-using Il2CppSLZ.Marrow.Warehouse;
-using LabFusion.Player;
-using LabFusion.Marrow;
-using LabFusion.Network.Serialization;
 
-namespace ModioModNetworker.Patches
+namespace ModioModNetworker.Patches;
+
+public class LevelLoadPatch
 {
-    public class LevelLoadPatch
-    {
-        [HarmonyPatch(typeof(LevelLoadMessage), "OnHandleMessage", typeof(ReceivedMessage))]
-        public static class PatchClass
-        {
-            public static bool Prefix(ReceivedMessage received)
-            {
-                if (!NetworkInfo.IsHost && !received.IsServerHandled && MainClass.autoDownloadLevels)
-                {
+	[HarmonyPatch(typeof(LevelLoadMessage), "OnHandleMessage", new Type[] { typeof(ReceivedMessage) })]
+	public static class PatchClass
+	{
+		public static bool Prefix(ReceivedMessage received)
+		{
+			//IL_0046: Unknown result type (might be due to invalid IL or missing references)
+			//IL_0050: Expected O, but got Unknown
+			//IL_0089: Unknown result type (might be due to invalid IL or missing references)
+			//IL_00a4: Unknown result type (might be due to invalid IL or missing references)
+			if (!NetworkInfo.IsHost && !received.IsServerHandled && MainClass.autoDownloadLevels)
+			{
+				LevelLoadData val = received.ReadData<LevelLoadData>();
+				if (!MainClass.overrideFusionDL)
+				{
+					return true;
+				}
+				LevelHoldQueue.ClearQueue();
+				if (!CrateFilterer.HasCrate<LevelCrate>(new Barcode(val.LevelBarcode)))
+				{
+					LevelHoldQueue.SetQueue(new LevelHoldQueue.LevelHoldQueueData
+					{
+						missingBarcode = val.LevelBarcode,
+						_data = val
+					});
+					if (!MainClass.confirmedHostHasIt)
+					{
+						LevelDownloaderManager.DownloadLevel(new LevelDownloaderManager.LevelDownloadInfo
+						{
+							LevelBarcode = val.LevelBarcode,
+							LevelHost = 0
+						});
+					}
+					return false;
+				}
+			}
+			return true;
+		}
+	}
 
-                    var data = received.ReadData<LevelLoadData>();
+	[HarmonyPatch(typeof(LoadSender), "SendLevelLoad", new Type[]
+	{
+		typeof(string),
+		typeof(string),
+		typeof(ulong)
+	})]
+	private static class SendLevelPatchClass
+	{
+		public static void Prefix(string barcode, string loadBarcode, ulong userId)
+		{
+			//IL_003e: Unknown result type (might be due to invalid IL or missing references)
+			if (!NetworkInfo.IsHost)
+			{
+				return;
+			}
+			ModInfo modInfoForLevelBarcode = ModInfoUtilities.GetModInfoForLevelBarcode(barcode);
+			if (modInfoForLevelBarcode == null)
+			{
+				return;
+			}
+			NetWriter val = NetWriter.Create();
+			try
+			{
+				ModlistData modlistData = ModlistData.Create(PlayerIDManager.LocalID, modInfoForLevelBarcode, ModlistData.ModType.LEVEL);
+				modlistData.Serialize((INetSerializer)(object)val);
+				NetMessage val2 = NetMessage.ModuleCreate<ModlistMessage>(val, CommonMessageRoutes.ReliableToClients, (byte?)null);
+				try
+				{
+					MessageSender.SendFromServer(userId, (NetworkChannel)0, val2);
+				}
+				finally
+				{
+					((IDisposable)val2)?.Dispose();
+				}
+			}
+			finally
+			{
+				((IDisposable)val)?.Dispose();
+			}
+		}
+	}
 
-                    if (!MainClass.overrideFusionDL)
-                    {
-                        return true;
-                    }
-
-                    // Clear the level queue no matter what because no matter what outcome it is, we are going to be loading a new level.
-                    LevelHoldQueue.ClearQueue();
-
-                    if (MainClass.confirmedHostHasIt || MainClass.useRepo)
-                    {
-                        if (!CrateFilterer.HasCrate<LevelCrate>(new Barcode(data.LevelBarcode)))
-                        {
-                            LevelHoldQueue.SetQueue(new LevelHoldQueue.LevelHoldQueueData()
-                            {
-                                missingBarcode = data.LevelBarcode,
-                                _data = data
-                            });
-                            return false;
-                        }
-                    }
-
-                }
-                return true;
-            }
-        }
-        
-        [HarmonyPatch(typeof(LoadSender), nameof(LoadSender.SendLevelLoad), typeof(string), typeof(string), typeof(ulong))]
-        private static class SendLevelPatchClass {
-            
-            public static void Prefix(string barcode, string loadBarcode, ulong userId)
-            {
-                if (!NetworkInfo.IsHost)
-                    return;
-                
-                ModInfo installedModInfo = ModInfoUtilities.GetModInfoForLevelBarcode(barcode);
-                if (installedModInfo != null)
-                {
-                    using (var writer = NetWriter.Create())
-                    {
-                        var data = ModlistData.Create(PlayerIDManager.LocalID, installedModInfo, ModlistData.ModType.LEVEL);
-                        data.Serialize(writer);
-                        using (var message = NetMessage.ModuleCreate<ModlistMessage>(writer, CommonMessageRoutes.ReliableToClients))
-                        {
-                            MessageSender.SendFromServer(userId, NetworkChannel.Reliable, message);
-                        }
-
-                    }
-                }
-            }
-        }
-        
-        [HarmonyPatch(typeof(LoadSender), nameof(LoadSender.SendLevelLoad), typeof(string), typeof(string))]
-        private static class SendLevelPatchClassGeneric {
-
-            public static void Prefix(string barcode, string loadBarcode)
-            {
-                if (!NetworkInfo.IsHost)
-                    return;
-
-                ModInfo installedModInfo = ModInfoUtilities.GetModInfoForLevelBarcode(barcode);
-                if (installedModInfo != null)
-                {
-                    using (var writer = NetWriter.Create())
-                    {
-                        var data = ModlistData.Create(PlayerIDManager.LocalID, installedModInfo, ModlistData.ModType.LEVEL);
-
-                        data.Serialize(writer);
-                        using (var message = NetMessage.ModuleCreate<ModlistMessage>(writer, CommonMessageRoutes.ReliableToClients))
-                        {
-                            MessageSender.BroadcastMessageExceptSelf(NetworkChannel.Reliable, message);
-                        }
-
-                    }
-                }
-            }
-        }
-    }
+	[HarmonyPatch(typeof(LoadSender), "SendLevelLoad", new Type[]
+	{
+		typeof(string),
+		typeof(string)
+	})]
+	private static class SendLevelPatchClassGeneric
+	{
+		public static void Prefix(string barcode, string loadBarcode)
+		{
+			//IL_003e: Unknown result type (might be due to invalid IL or missing references)
+			if (!NetworkInfo.IsHost)
+			{
+				return;
+			}
+			ModInfo modInfoForLevelBarcode = ModInfoUtilities.GetModInfoForLevelBarcode(barcode);
+			if (modInfoForLevelBarcode == null)
+			{
+				return;
+			}
+			NetWriter val = NetWriter.Create();
+			try
+			{
+				ModlistData modlistData = ModlistData.Create(PlayerIDManager.LocalID, modInfoForLevelBarcode, ModlistData.ModType.LEVEL);
+				modlistData.Serialize((INetSerializer)(object)val);
+				NetMessage val2 = NetMessage.ModuleCreate<ModlistMessage>(val, CommonMessageRoutes.ReliableToClients, (byte?)null);
+				try
+				{
+					MessageSender.BroadcastMessageExceptSelf((NetworkChannel)0, val2);
+				}
+				finally
+				{
+					((IDisposable)val2)?.Dispose();
+				}
+			}
+			finally
+			{
+				((IDisposable)val)?.Dispose();
+			}
+		}
+	}
 }
