@@ -545,8 +545,7 @@ public class MainClass : MelonMod
 			var cacheList = Newtonsoft.Json.JsonConvert.DeserializeObject<List<Dictionary<string, string>>>(json);
 			if (cacheList == null || cacheList.Count == 0)
 			{
-				MelonLoader.MelonLogger.Msg("[Diag] Cache: Empty cache file");
-				return;
+					return;
 			}
 
 			// Populate ModInfo objects from cache and add to totalInstalled
@@ -583,7 +582,7 @@ public class MainClass : MelonMod
 					}
 				}
 			}
-			MelonLoader.MelonLogger.Msg($"[Diag] Cache: Loaded {cacheList.Count} entries, cross-referenced {count} installed mods");
+
 		}
 		catch (Exception ex)
 		{
@@ -593,7 +592,6 @@ public class MainClass : MelonMod
 
 	public static void CrossReferenceInstalledMods()
 	{
-		MelonLoader.MelonLogger.Msg("[Diag] Cross-reference: Checking installed mods against subscribedMods...");
 		int count = 0;
 		foreach (ModInfo installedMod in NetworkerMenuController.totalInstalled)
 		{
@@ -680,7 +678,8 @@ public class MainClass : MelonMod
 				}
 			}
 		}
-		MelonLoader.MelonLogger.Msg($"[Diag] Cross-reference: Updated {count} installed mods from subscription data.");
+		if (count > 0)
+			MelonLogger.Msg($"[Diag] Cross-reference: Updated {count} installed mods");
 	}
 
 	public static void SaveSubscriptionCache()
@@ -706,7 +705,7 @@ public class MainClass : MelonMod
 
 			string json = Newtonsoft.Json.JsonConvert.SerializeObject(cacheList, Newtonsoft.Json.Formatting.Indented);
 			File.WriteAllText(subDataCachePath, json);
-			MelonLoader.MelonLogger.Msg($"[Diag] Cache: Saved {cacheList.Count} subscription entries to {subDataCachePath}");
+
 		}
 		catch (Exception ex)
 		{
@@ -1053,7 +1052,6 @@ public class MainClass : MelonMod
 				{
 					modInfo.PopulateFromInfoString(text2);
 				}
-				MelonLogger.Msg($"[Diag] Installed mod: modId={modId} numericalId={modInfo.numericalId ?? "null"} modName={modInfo.modName ?? "null"}");
 				// Fallback: if modName wasn't set from info string, use modId (title from manifest)
 				if (string.IsNullOrEmpty(modInfo.modName))
 				{
@@ -1074,6 +1072,7 @@ public class MainClass : MelonMod
 			{
 			}
 		}
+		MelonLogger.Msg($"[Diag] Scanned {NetworkerMenuController.totalInstalled.Count} installed mods");
 		// Re-apply cache data now that totalInstalled is populated
 		CrossReferenceInstalledMods();
 	}

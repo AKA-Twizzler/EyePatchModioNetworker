@@ -49,18 +49,9 @@ public class ModInfoDisplay : MonoBehaviour
 	public void SetModInfo(ModInfo modInfo)
 	{
 		this.modInfo = modInfo;
-		MelonLogger.Msg($"[Diag] SetModInfo called - modInfo is NULL? {modInfo == null}");
-		if (modInfo != null)
-		{
-			MelonLogger.Msg($"[Diag] SetModInfo - modName={modInfo.modName ?? "null"} fileSizeKB={modInfo.fileSizeKB} numericalId={modInfo.numericalId ?? "null"} thumbnailLink={(modInfo.thumbnailLink != null && modInfo.thumbnailLink.Length > 0 ? "SET" : "null")} subscribed={modInfo.IsSubscribed()}");
-		}
 		if (modInfo == null || modInfo.modName == null)
 		{
-			MelonLogger.Error($"[Diag] SetModInfo: modInfo or modName is NULL! Display will be broken!");
-			if (modInfo != null && modInfo.modId != null)
-			{
-				MelonLogger.Msg($"[Diag] SetModInfo: falling back to modId={modInfo.modId}");
-			}
+			MelonLogger.Error($"[Diag] SetModInfo: modInfo or modName is NULL! modId={modInfo?.modId ?? "null"}");
 		}
 		title.text = modInfo?.modName ?? modInfo?.modId ?? "Unknown";
 		if (modInfo == null || !modInfo.IsSubscribed())

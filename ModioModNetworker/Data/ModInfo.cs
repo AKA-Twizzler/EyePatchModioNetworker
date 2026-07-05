@@ -312,7 +312,6 @@ public class ModInfo
 			modInfo.version = (string)mod["version"];
 		}
 		catch (Exception ex4) { }
-		MelonLogger.Msg($"[Diag] MakeFromDynamic: modId={modId} fileSizeKB={modInfo.fileSizeKB} fileName={modInfo.fileName ?? "null"}");
 		return modInfo;
 	}
 

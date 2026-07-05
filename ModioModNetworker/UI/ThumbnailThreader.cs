@@ -26,7 +26,6 @@ public class ThumbnailThreader
 	{
 		if (string.IsNullOrEmpty(url))
 		{
-			MelonLoader.MelonLogger.Msg("[Diag] DownloadThumbnail: Called with null or empty URL.");
 			return;
 		}
 
@@ -42,10 +41,6 @@ public class ThumbnailThreader
 				break;
 			}
 		}
-
-		MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: CDN URL: {url}");
-		if (apiFallbackUrl != null)
-			MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: API fallback URL: {apiFallbackUrl}");
 
 		System.Threading.Tasks.Task.Run(async delegate
 		{
@@ -77,20 +72,17 @@ public class ThumbnailThreader
 					{
 						cdnClient.DefaultRequestHeaders.UserAgent.ParseAdd("ModioModNetworker/2.8.17");
 						byte[] imageBytes = await cdnClient.GetByteArrayAsync(url);
-						MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: CDN (IPv4 forced) success: {imageBytes.Length} bytes");
 						CreateTexture(imageBytes, action);
 						return;
 					}
 				}
-				catch (Exception ex)
+				catch (Exception)
 				{
-					MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: CDN (IPv4 forced) failed: {ex.Message}");
 				}
 
 				// Fallback: try API endpoint with Accept header for image content
 				if (apiFallbackUrl != null)
 				{
-					MelonLoader.MelonLogger.Msg("[Diag] DownloadThumbnail: Trying API logo endpoint...");
 					using (var handler = new System.Net.Http.HttpClientHandler
 					{
 						ServerCertificateCustomValidationCallback = (_, _, _, _) => true
@@ -118,20 +110,9 @@ public class ThumbnailThreader
 							byte[] imageBytes = await response.Content.ReadAsByteArrayAsync();
 							if (imageBytes.Length > 1000 && imageBytes[0] != 0x7b) // Not JSON (not starting with '{')
 							{
-								MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: API image request success: {imageBytes.Length} bytes, content-type: {response.Content.Headers.ContentType?.MediaType}");
 								CreateTexture(imageBytes, action);
 								return;
 							}
-							else
-							{
-								// Got JSON instead of image — log it
-								string jsonText = System.Text.Encoding.UTF8.GetString(imageBytes);
-								MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: API returned JSON, length={imageBytes.Length}");
-							}
-						}
-						else
-						{
-							MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: API image request failed: HTTP {(int)response.StatusCode}");
 						}
 					}
 				}
@@ -154,7 +135,6 @@ public class ThumbnailThreader
 				Texture2D texture = new Texture2D(2, 2);
 				if (UnityEngine.ImageConversion.LoadImage(texture, imageBytes))
 				{
-					MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: Texture created: {texture.width}x{texture.height}");
 					action(texture);
 				}
 				else
