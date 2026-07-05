@@ -611,7 +611,9 @@ public class MainClass : MelonMod
 	{
 		string text = subscriptionThreadString;
 		subscriptionThreadString = "";
-		dynamic val = JsonConvert.DeserializeObject<object>(text);
+		try
+		{
+			dynamic val = JsonConvert.DeserializeObject<object>(text);
 		int num = 0;
 		int num2 = SafeInt(val, "result_total");
 		if (subTotal == 0)
@@ -709,6 +711,11 @@ public class MainClass : MelonMod
 		if (subsShown >= subTotal)
 		{
 			subsRefreshing = true;
+		}
+		}
+		catch (Exception e)
+		{
+			MelonLogger.Error("Failed to process subscriptions: " + e);
 		}
 	}
 

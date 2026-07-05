@@ -20,6 +20,11 @@ public class ThumbnailThreader
 
 	public static void DownloadThumbnail(string url, Action<Texture> action)
 	{
+		if (string.IsNullOrEmpty(url))
+		{
+			MelonLoader.MelonLogger.Warning("Thumbnail URL is null or empty");
+			return;
+		}
 		UnityWebRequest webRequest = UnityWebRequestTexture.GetTexture(url);
 		UnityWebRequestAsyncOperation val = webRequest.SendWebRequest();
 		((AsyncOperation)val).m_completeCallback = ((AsyncOperation)val).m_completeCallback + new Action<AsyncOperation>(delegate
