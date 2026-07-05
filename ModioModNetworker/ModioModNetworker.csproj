@@ -43,6 +43,7 @@
     <Reference Include="Il2CppSystem.Core" HintPath="/mnt/d/SteamLibrary/steamapps/common/BONELAB/MelonLoader/Il2CppAssemblies/Il2CppSystem.Core.dll" />
     <Reference Include="Il2CppInterop.Common" HintPath="/mnt/d/SteamLibrary/steamapps/common/BONELAB/MelonLoader/net6/Il2CppInterop.Common.dll" />
     <Reference Include="UnityEngine.UnityWebRequestWWWModule" HintPath="/mnt/d/SteamLibrary/steamapps/common/BONELAB/MelonLoader/Il2CppAssemblies/UnityEngine.UnityWebRequestWWWModule.dll" />
+    <Reference Include="UnityEngine.ImageConversionModule" HintPath="/mnt/d/SteamLibrary/steamapps/common/BONELAB/MelonLoader/Il2CppAssemblies/UnityEngine.ImageConversionModule.dll" />
     <Reference Include="UnityEngine.InputLegacyModule" HintPath="/mnt/d/SteamLibrary/steamapps/common/BONELAB/MelonLoader/Il2CppAssemblies/UnityEngine.InputLegacyModule.dll" />
     <Reference Include="UnityEngine.TextRenderingModule" HintPath="/mnt/d/SteamLibrary/steamapps/common/BONELAB/MelonLoader/Il2CppAssemblies/UnityEngine.TextRenderingModule.dll" />
     <Reference Include="UnityEngine.InputModule" HintPath="/mnt/d/SteamLibrary/steamapps/common/BONELAB/MelonLoader/Il2CppAssemblies/UnityEngine.InputModule.dll" />

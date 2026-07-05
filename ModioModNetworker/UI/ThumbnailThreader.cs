@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Il2CppInterop.Runtime.InteropTypes;
 using UnityEngine;
 using UnityEngine.Networking;
+using System.Threading.Tasks;
 
 namespace ModioModNetworker.UI;
 
@@ -23,63 +24,56 @@ public class ThumbnailThreader
 	{
 		if (string.IsNullOrEmpty(url))
 		{
-			MelonLoader.MelonLogger.Warning("Thumbnail URL is null or empty");
 			MelonLoader.MelonLogger.Msg("[Diag] DownloadThumbnail: Called with null or empty URL.");
 			return;
 		}
-		MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: Starting download from URL: {url}");
 
-		// Try HTTPS first, then HTTP as fallback for TLS issues
-		List<string> urlsToTry = new List<string>();
-		urlsToTry.Add(url);  // Original HTTPS URL
-		if (url.StartsWith("https://"))
-		{
-			urlsToTry.Add("http://" + url.Substring(8));  // HTTP fallback
-		}
-		if (url.Contains("thumb.modcdn.io"))
-		{
-			string altUrl = url.Replace("thumb.modcdn.io", "assets.modcdn.io");
-			MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: Also trying alt CDN: {altUrl}");
-			urlsToTry.Add(altUrl);  // Alt CDN HTTPS
-			urlsToTry.Add("http://" + altUrl.Substring(8));  // Alt CDN HTTP
-		}
+		MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: Starting download via HttpClient: {url}");
 
-		foreach (string tryUrl in urlsToTry)
+		System.Threading.Tasks.Task.Run(async delegate
 		{
-			UnityWebRequest webRequest = UnityWebRequest.Get(tryUrl);
-			DownloadHandlerTexture handler = new DownloadHandlerTexture(true);
-			webRequest.downloadHandler = handler;
-			webRequest.SetRequestHeader("User-Agent", "ModioModNetworker/2.8.10");
-			UnityWebRequestAsyncOperation val = webRequest.SendWebRequest();
-			((AsyncOperation)val).m_completeCallback = ((AsyncOperation)val).m_completeCallback + new Action<AsyncOperation>(delegate
+			try
 			{
-				ThumbnailCompletionJob item = new ThumbnailCompletionJob
+				using (var handler = new System.Net.Http.HttpClientHandler
 				{
-					callback = delegate
+					ServerCertificateCustomValidationCallback = (_, _, _, _) => true
+				})
+				using (var client = new System.Net.Http.HttpClient(handler)
+				{
+					Timeout = TimeSpan.FromSeconds(15)
+				})
+				{
+					client.DefaultRequestHeaders.UserAgent.ParseAdd("ModioModNetworker/2.8.15");
+					byte[] imageBytes = await client.GetByteArrayAsync(url);
+
+					MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: Downloaded {imageBytes.Length} bytes via HttpClient");
+
+					MainThreadManager.QueueAction(delegate
 					{
 						try
 						{
-							if ((int)webRequest.result == 1)
+							Texture2D texture = new Texture2D(2, 2);
+							if (UnityEngine.ImageConversion.LoadImage(texture, imageBytes))
 							{
-								DownloadHandlerTexture val2 = ((Il2CppObjectBase)webRequest.downloadHandler).Cast<DownloadHandlerTexture>();
-								Texture texture = (Texture)(object)val2.texture;
-								MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: Download succeeded. Texture: {texture.name}, Size: {texture.width}x{texture.height}");
+								MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: Texture created: {texture.width}x{texture.height}");
 								action(texture);
 							}
 							else
 							{
-								MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: Download failed. Result: {(UnityWebRequest.Result)webRequest.result}, Error: {webRequest.error}, URL: {tryUrl}");
-								MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: Response code: {webRequest.responseCode}");
+								MelonLoader.MelonLogger.Error("[Diag] DownloadThumbnail: ImageConversion.LoadImage returned false");
 							}
 						}
 						catch (Exception ex)
 						{
-							MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: Exception during download processing: {ex.Message}");
+							MelonLoader.MelonLogger.Error($"[Diag] DownloadThumbnail: Texture creation failed: {ex.Message}");
 						}
-					}
-				};
-				thumbnailCompletionJobs.Enqueue(item);
-			});
-		}
+					});
+				}
+			}
+			catch (Exception ex)
+			{
+				MelonLoader.MelonLogger.Error($"[Diag] DownloadThumbnail: HttpClient download failed: {ex.Message}");
+			}
+		});
 	}
 }
