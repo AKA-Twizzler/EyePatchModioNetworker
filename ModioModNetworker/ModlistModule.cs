@@ -10,7 +10,7 @@ public class ModlistModule : Module
 
 	public override string Author => "notnotnotswipez";
 
-	public override Version Version => new Version("2.8.3");
+	public override Version Version => new Version("2.8.4");
 
 	public override ConsoleColor Color => ConsoleColor.Cyan;
 
