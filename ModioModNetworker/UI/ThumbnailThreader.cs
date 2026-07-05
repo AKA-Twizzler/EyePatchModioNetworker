@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using Il2CppInterop.Runtime.InteropTypes;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -28,13 +29,19 @@ public class ThumbnailThreader
 		}
 		MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: Starting download from URL: {url}");
 
-		// Try both CDN domains in case one is blocked
-		string[] urlsToTry = new string[] { url };
+		// Try HTTPS first, then HTTP as fallback for TLS issues
+		List<string> urlsToTry = new List<string>();
+		urlsToTry.Add(url);  // Original HTTPS URL
+		if (url.StartsWith("https://"))
+		{
+			urlsToTry.Add("http://" + url.Substring(8));  // HTTP fallback
+		}
 		if (url.Contains("thumb.modcdn.io"))
 		{
 			string altUrl = url.Replace("thumb.modcdn.io", "assets.modcdn.io");
 			MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: Also trying alt CDN: {altUrl}");
-			urlsToTry = new string[] { url, altUrl };
+			urlsToTry.Add(altUrl);  // Alt CDN HTTPS
+			urlsToTry.Add("http://" + altUrl.Substring(8));  // Alt CDN HTTP
 		}
 
 		foreach (string tryUrl in urlsToTry)
