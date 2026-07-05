@@ -358,6 +358,7 @@ public class NetworkerMenuController : MonoBehaviour
 		maxPages = 0;
 	}
 
+	[HideFromIl2Cpp]
 	public void TriggerModInfoPopup(bool show, ModInfo modInfo)
 	{
 		rootAnimator = ((Component)this).GetComponentInParent<Animator>();
@@ -705,6 +706,7 @@ public class NetworkerMenuController : MonoBehaviour
 		}
 	}
 
+	[HideFromIl2Cpp]
 	private GameObject MakeModInfoObject(Transform parent, ModInfo modInfo, bool zeroPosition = true)
 	{
 		GameObject val = UnityEngine.Object.Instantiate<GameObject>(NetworkerAssets.modInfoDisplay);
@@ -1032,6 +1034,7 @@ public class NetworkerMenuController : MonoBehaviour
 		SetMainCanvasColliderState(enabled: false);
 	}
 
+	[HideFromIl2Cpp]
 	private void SetKeyAction(string keyName, Action action)
 	{
 		GameObject gameObject = ((Component)keyboardPopup.transform.Find("Keyboard").Find(keyName)).gameObject;

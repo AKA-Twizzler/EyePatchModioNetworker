@@ -45,6 +45,7 @@ public class ModInfoDisplay : MonoBehaviour
 		controller.TriggerModInfoPopup(show: true, modInfo);
 	}
 
+	[HideFromIl2Cpp]
 	public void SetModInfo(ModInfo modInfo)
 	{
 		this.modInfo = modInfo;
