@@ -6,7 +6,6 @@ using BoneLib;
 using Il2CppSLZ.Marrow.Forklift.Model;
 using LabFusion.Player;
 using MelonLoader;
-using ModioModNetworker.UI;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
@@ -155,7 +154,7 @@ public class ModInfo
 			catch (Exception)
 			{
 			}
-			((Dictionary<string, ModTarget>)(object)val.Targets).Add("pc", (ModTarget)(object)val2);
+			val.Targets.Add("pc", (ModTarget)(object)val2);
 			ModIOModTarget val3 = new ModIOModTarget();
 			((ModTarget)val3).ThumbnailOverride = null;
 			val3.GameId = 3809L;
@@ -170,9 +169,9 @@ public class ModInfo
 			catch (Exception)
 			{
 			}
-			((Dictionary<string, ModTarget>)(object)val.Targets).Add("android", (ModTarget)(object)val3);
+			val.Targets.Add("android", (ModTarget)(object)val3);
 			string text = ToInfoString();
-			((Dictionary<string, ModTarget>)(object)val.Targets).Add(text, (ModTarget)(object)val2);
+			val.Targets.Add(text, (ModTarget)(object)val2);
 		}
 		catch (Exception ex3)
 		{
