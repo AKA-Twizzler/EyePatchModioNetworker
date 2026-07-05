@@ -634,6 +634,19 @@ public class MainClass : MelonMod
 					}
 				}
 
+				// Strategy 5: Match by display title (installed modId is the title from manifest)
+				if (!matches && !string.IsNullOrEmpty(installedMod.modId) && 
+				    !string.IsNullOrEmpty(subMod.modName))
+				{
+					// Check if installed modId (title) contains subscription modName or vice versa
+					string installedTitle = installedMod.modId.ToLowerInvariant().Replace(" ", "").Replace("-", "").Replace("_", "");
+					string subName = subMod.modName.ToLowerInvariant().Replace(" ", "").Replace("-", "").Replace("_", "");
+					if (installedTitle.Contains(subName) || subName.Contains(installedTitle))
+					{
+						matches = true;
+					}
+				}
+
 				if (matches)
 				{
 					bool updated = false;
@@ -642,11 +655,14 @@ public class MainClass : MelonMod
 						installedMod.numericalId = subMod.numericalId;
 						updated = true;
 					}
-					if (string.IsNullOrEmpty(installedMod.modName) && !string.IsNullOrEmpty(subMod.modName))
+				if (!string.IsNullOrEmpty(subMod.modName))
+				{
+					if (installedMod.modName != subMod.modName)
 					{
 						installedMod.modName = subMod.modName;
 						updated = true;
 					}
+				}
 					if (string.IsNullOrEmpty(installedMod.thumbnailLink) && !string.IsNullOrEmpty(subMod.thumbnailLink))
 					{
 						installedMod.thumbnailLink = subMod.thumbnailLink;
