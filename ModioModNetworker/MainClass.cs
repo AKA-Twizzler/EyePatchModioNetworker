@@ -158,41 +158,8 @@ public class MainClass : MelonMod
 		overrideFusionDL = overrideFusionDLConfig.Value;
 		ModFileManager.MOD_FOLDER_PATH = modsDirectory.Value;
 		SpotlightOverride.LoadFromRegularURL();
-		// Diagnostic: log embedded resources
-		string[] resources = Assembly.GetExecutingAssembly().GetManifestResourceNames();
-		MelonLogger.Msg($"=== AssetBundle Diagnostic ===");
-		MelonLogger.Msg($"Found {resources.Length} embedded resources:");
-		foreach (string res in resources)
-			MelonLogger.Msg($"  Resource: {res}");
-
-		string resourceName = HelperMethods.IsAndroid()
-			? "ModioModNetworker.Resources.networkermenu.android.networker"
-			: "ModioModNetworker.Resources.networkermenu.networker";
-		MelonLogger.Msg($"Target resource: {resourceName}");
-
 		AssetBundle bundle = (HelperMethods.IsAndroid() ? HelperMethods.LoadEmbeddedAssetBundle(Assembly.GetExecutingAssembly(), "ModioModNetworker.Resources.networkermenu.android.networker") : HelperMethods.LoadEmbeddedAssetBundle(Assembly.GetExecutingAssembly(), "ModioModNetworker.Resources.networkermenu.networker"));
-		if (bundle == null)
-		{
-			MelonLogger.Error("FAIL: AssetBundle is NULL after LoadEmbeddedAssetBundle!");
-		}
-		else
-		{
-			MelonLogger.Msg($"OK: AssetBundle loaded! Scanning assets...");
-			string[] assetNames = bundle.GetAllAssetNames();
-			MelonLogger.Msg($"Bundle contains {assetNames.Length} assets:");
-			foreach (string assetName in assetNames)
-				MelonLogger.Msg($"  Asset: {assetName}");
-		}
-
 		NetworkerAssets.LoadAssetsUI(bundle);
-		MelonLogger.Msg($"Post-LoadAssetsUI:");
-		MelonLogger.Msg($"  avatarDownloadBarPrefab: {(NetworkerAssets.avatarDownloadBarPrefab != null ? "OK" : "NULL")}");
-		MelonLogger.Msg($"  uiMenuPrefab: {(NetworkerAssets.uiMenuPrefab != null ? "OK" : "NULL")}");
-		MelonLogger.Msg($"  modInfoDisplay: {(NetworkerAssets.modInfoDisplay != null ? "OK" : "NULL")}");
-		MelonLogger.Msg($"  blacklistDisplayPrefab: {(NetworkerAssets.blacklistDisplayPrefab != null ? "OK" : "NULL")}");
-		MelonLogger.Msg($"  checkboxSettingPrefab: {(NetworkerAssets.checkboxSettingPrefab != null ? "OK" : "NULL")}");
-		MelonLogger.Msg($"  numericalSettingPrefab: {(NetworkerAssets.numericalSettingPrefab != null ? "OK" : "NULL")}");
-		MelonLogger.Msg($"=== End AssetBundle Diagnostic ===");
 		PrepareModFiles();
 		string text = ReadAuthKey();
 		if (!string.IsNullOrEmpty(text))
@@ -736,6 +703,7 @@ public class MainClass : MelonMod
 				modInfo.isValidMod = true;
 			}
 			ReceiveSubModInfo(modInfo);
+			NetworkerMenuController.modIoRetrieved.Add(modInfo);
 		}
 		subsShown += num3;
 		if (subTotal - subsShown > 0)
@@ -872,12 +840,15 @@ public class MainClass : MelonMod
 						catch { }
 					}
 				}
-				modInfo.numericalId = value.ToString() ?? "";
+				if (value != 0)
+					modInfo.numericalId = value.ToString();
+				// If value is 0, numericalId stays null until PopulateFromInfoString or other source sets it
 				modInfo.structureVersion = ModInfo.globalStructureVersion;
 				if (text2 != "")
 				{
 					modInfo.PopulateFromInfoString(text2);
 				}
+				MelonLogger.Msg($"[Diag] Installed mod: modId={modId} numericalId={modInfo.numericalId ?? "null"} modName={modInfo.modName ?? "null"}");
 				// Fallback: if modName wasn't set from info string, use modId (title from manifest)
 				if (string.IsNullOrEmpty(modInfo.modName))
 				{

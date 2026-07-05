@@ -199,17 +199,35 @@ public class ModInfo
 	public void PopulateFromInfoString(string targetString)
 	{
 		string[] array = ToSafeString(targetString).Split(";");
+		if (array.Length < 8) return;
+
 		mature = bool.Parse(array[1]);
 		temp = bool.Parse(array[2]);
-		fileSizeKB = float.Parse(array[3]);
-		fileName = array[4];
-		structureVersion = int.Parse(array[5]);
-		modName = array[6];
-		int num = int.Parse(array[7]);
-		int num2 = 8;
-		for (int i = 0; i < num; i++)
+
+		if (float.TryParse(array[3], out float parsedSize) && parsedSize > 0f)
 		{
-			tags.Add(array[i + num2]);
+			fileSizeKB = parsedSize;
+		}
+
+		if (!string.IsNullOrEmpty(array[4]))
+		{
+			fileName = array[4];
+		}
+
+		structureVersion = int.Parse(array[5]);
+
+		if (!string.IsNullOrEmpty(array[6]))
+		{
+			modName = array[6];
+		}
+
+		if (array.Length > 7 && int.TryParse(array[7], out int num))
+		{
+			int num2 = 8;
+			for (int i = 0; i < num && (i + num2) < array.Length; i++)
+			{
+				tags.Add(array[i + num2]);
+			}
 		}
 		isValidMod = true;
 	}
@@ -267,10 +285,34 @@ public class ModInfo
 		modInfo.modId = modId;
 		modInfo.isValidMod = true;
 		modInfo.downloading = false;
-		modInfo.fileSizeKB = (float)mod["filesize"];
-		modInfo.fileName = (string)mod["filename"];
-		modInfo.windowsDownloadLink = (string)mod["download"]["binary_url"];
-		modInfo.version = (string)mod["version"];
+		try
+		{
+			modInfo.fileSizeKB = (float)mod["filesize"];
+		}
+		catch (Exception ex)
+		{
+			MelonLogger.Error($"[Diag] MakeFromDynamic: filesize parse failed for modId={modId}: {ex.Message}");
+			modInfo.fileSizeKB = 0f;
+		}
+		try
+		{
+			modInfo.fileName = (string)mod["filename"];
+		}
+		catch (Exception ex2)
+		{
+			MelonLogger.Error($"[Diag] MakeFromDynamic: filename parse failed: {ex2.Message}");
+		}
+		try
+		{
+			modInfo.windowsDownloadLink = (string)mod["download"]["binary_url"];
+		}
+		catch (Exception ex3) { }
+		try
+		{
+			modInfo.version = (string)mod["version"];
+		}
+		catch (Exception ex4) { }
+		MelonLogger.Msg($"[Diag] MakeFromDynamic: modId={modId} fileSizeKB={modInfo.fileSizeKB} fileName={modInfo.fileName ?? "null"}");
 		return modInfo;
 	}
 

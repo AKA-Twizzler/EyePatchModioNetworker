@@ -371,6 +371,7 @@ public class NetworkerMenuController : MonoBehaviour
 			TMP_Text component3 = ((Component)modInfoPopup.transform.Find("FileSizeDisplay")).GetComponent<TMP_Text>();
 			RawImage thumbnail = ((Component)modInfoPopup.transform.Find("Thumbnail")).GetComponent<RawImage>();
 			component.text = modInfo.modName;
+			MelonLogger.Msg($"[Diag] TriggerModInfoPopup - modName={modInfo?.modName ?? "null"} fileSizeKB={modInfo?.fileSizeKB} numericalId={modInfo?.numericalId ?? "null"} thumbnailLink={(modInfo?.thumbnailLink != null && modInfo?.thumbnailLink.Length > 0 ? "SET" : "null")} subscribed={modInfo?.IsSubscribed()}");
 			component2.text = modInfo.modSummary;
 			float fileSizeKB = modInfo.fileSizeKB;
 			float num = fileSizeKB / 1000000f;

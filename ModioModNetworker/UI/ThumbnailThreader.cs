@@ -23,8 +23,10 @@ public class ThumbnailThreader
 		if (string.IsNullOrEmpty(url))
 		{
 			MelonLoader.MelonLogger.Warning("Thumbnail URL is null or empty");
+			MelonLoader.MelonLogger.Msg("[Diag] DownloadThumbnail: Called with null or empty URL.");
 			return;
 		}
+		MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: Starting download from URL: {url}");
 		UnityWebRequest webRequest = UnityWebRequestTexture.GetTexture(url);
 		webRequest.SetRequestHeader("Authorization", "Bearer " + ModFileManager.OAUTH_KEY);
 		webRequest.SetRequestHeader("X-Modio-Platform", "windows");
@@ -36,11 +38,23 @@ public class ThumbnailThreader
 			{
 				callback = delegate
 				{
-					if ((int)webRequest.result == 1)
+					try
 					{
-						DownloadHandlerTexture val2 = ((Il2CppObjectBase)webRequest.downloadHandler).Cast<DownloadHandlerTexture>();
-						Texture texture = (Texture)(object)val2.texture;
-						action(texture);
+						if ((int)webRequest.result == 1)
+						{
+							DownloadHandlerTexture val2 = ((Il2CppObjectBase)webRequest.downloadHandler).Cast<DownloadHandlerTexture>();
+							Texture texture = (Texture)(object)val2.texture;
+							MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: Download succeeded. Texture: {texture.name}, Size: {texture.width}x{texture.height}");
+							action(texture);
+						}
+						else
+						{
+							MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: Download failed. Result: {(UnityWebRequest.Result)webRequest.result}, URL: {url}");
+						}
+					}
+					catch (Exception ex)
+					{
+						MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: Exception during download processing: {ex.Message}");
 					}
 				}
 			};
