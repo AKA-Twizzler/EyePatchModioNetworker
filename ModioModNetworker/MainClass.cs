@@ -552,7 +552,7 @@ public class MainClass : MelonMod
 				{
 					if ((string)item2["platform"] == "windows")
 					{
-						int num3 = (int)item2["modfile_live"];
+						int num3 = SafeInt(item2, "modfile_live");
 						num = num3;
 						break;
 					}
@@ -561,7 +561,7 @@ public class MainClass : MelonMod
 				{
 					if ((string)item3["platform"] == "android")
 					{
-						int num4 = (int)item3["modfile_live"];
+						int num4 = SafeInt(item3, "modfile_live");
 						num2 = num4;
 						break;
 					}
@@ -570,13 +570,13 @@ public class MainClass : MelonMod
 				{
 					flag = false;
 				}
-				if ((int)item["status"] == 3)
+				if (SafeInt(item, "status") == 3)
 				{
 					flag = false;
 				}
 				ModInfo modInfo = ModInfo.MakeFromDynamic(item["modfile"], text4);
 				modInfo.isValidMod = false;
-				modInfo.mature = (int)item["maturity_option"] > 0;
+				modInfo.mature = SafeInt(item, "maturity_option") > 0;
 				modInfo.modName = text3;
 				modInfo.thumbnailLink = thumbnailLink;
 				modInfo.modSummary = modSummary;
@@ -613,14 +613,14 @@ public class MainClass : MelonMod
 		subscriptionThreadString = "";
 		dynamic val = JsonConvert.DeserializeObject<object>(text);
 		int num = 0;
-		int num2 = (int)val["result_total"];
+		int num2 = SafeInt(val, "result_total");
 		if (subTotal == 0)
 		{
 			MelonLogger.Msg("Total subscriptions: " + num2);
 			subTotal = num2;
 			desiredSubs = 0;
 		}
-		int num3 = (int)val["result_count"];
+		int num3 = SafeInt(val, "result_count");
 		if (num3 == 0)
 		{
 			MelonLogger.Msg("No subscriptions found!");
@@ -628,7 +628,7 @@ public class MainClass : MelonMod
 		}
 		foreach (dynamic item in val["data"])
 		{
-			if ((int)item["game_id"] == 3809)
+			if (SafeInt(item, "game_id") == 3809)
 			{
 				num++;
 			}
@@ -641,7 +641,7 @@ public class MainClass : MelonMod
 		ModInfo.requestSize = num;
 		foreach (dynamic item2 in val["data"])
 		{
-			if ((int)item2["game_id"] != 3809)
+			if (SafeInt(item2, "game_id") != 3809)
 			{
 				continue;
 			}
@@ -659,7 +659,7 @@ public class MainClass : MelonMod
 			{
 				if ((string)item3["platform"] == "windows")
 				{
-					int num6 = (int)item3["modfile_live"];
+					int num6 = SafeInt(item3, "modfile_live");
 					num4 = num6;
 					break;
 				}
@@ -668,7 +668,7 @@ public class MainClass : MelonMod
 			{
 				if ((string)item4["platform"] == "android")
 				{
-					int num7 = (int)item4["modfile_live"];
+					int num7 = SafeInt(item4, "modfile_live");
 					num5 = num7;
 					break;
 				}
@@ -677,13 +677,13 @@ public class MainClass : MelonMod
 			{
 				flag = false;
 			}
-			if ((int)item2["status"] == 3)
+			if (SafeInt(item2, "status") == 3)
 			{
 				flag = false;
 			}
 			ModInfo modInfo = ModInfo.MakeFromDynamic(item2["modfile"], text3);
 			modInfo.isValidMod = false;
-			modInfo.mature = (int)item2["maturity_option"] > 0;
+			modInfo.mature = SafeInt(item2, "maturity_option") > 0;
 			modInfo.modName = modName;
 			modInfo.thumbnailLink = thumbnailLink;
 			modInfo.modSummary = modSummary;
@@ -991,6 +991,13 @@ public class MainClass : MelonMod
 		}
 		File.Delete(MODIO_BLACKLIST_TXT_DIRECTORY);
 		File.Move(tempFileName, MODIO_BLACKLIST_TXT_DIRECTORY);
+	}
+
+	private static int SafeInt(dynamic obj, string key, int defaultValue = 0)
+	{
+		if (obj == null) return defaultValue;
+		try { return (int)obj[key]; }
+		catch { return defaultValue; }
 	}
 
 	private string ReadAuthKey()

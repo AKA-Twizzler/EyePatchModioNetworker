@@ -14,7 +14,7 @@ namespace ModioModNetworker.Patches;
 
 public class AvatarSwitchPatch
 {
-	[HarmonyPatch(typeof(PlayerSender), "SendPlayerAvatar", new Type[] { typeof(PlayerID), typeof(ulong) })]
+	[HarmonyPatch(typeof(PlayerSender), "SendPlayerAvatar")]
 	public static class PlayerSenderPatch
 	{
 		public static void Postfix()
