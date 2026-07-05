@@ -1,6 +1,6 @@
 using System;
 
-namespace ThunderstoreModAssistant.Utilities;
+namespace ModioModNetworker.Utilities;
 
 public class TimerDelayedAction
 {

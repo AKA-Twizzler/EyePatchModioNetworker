@@ -7,7 +7,7 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
 
-namespace ModIoModNetworker.Ui;
+namespace ModioModNetworker.UI;
 
 [RegisterTypeInIl2Cpp]
 public class ModInfoDisplay : MonoBehaviour

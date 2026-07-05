@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace ThunderstoreModAssistant.Utilities;
+namespace ModioModNetworker.Utilities;
 
 public class TimerManager
 {
