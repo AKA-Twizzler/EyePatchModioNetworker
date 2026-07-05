@@ -271,7 +271,7 @@ public class ModFileManager
 		if (!fetchingSubscriptions)
 		{
 			fetchingSubscriptions = true;
-			UnityWebRequest httpWebRequest = UnityWebRequest.Get("https://g-3809.modapi.io/v1/me/subscribed?_offset=" + shown + "&limit=400");
+			UnityWebRequest httpWebRequest = UnityWebRequest.Get("https://g-3809.modapi.io/v1/me/subscribed?_offset=" + shown + "&limit=400&game_id=3809");
 			httpWebRequest.SetRequestHeader("Authorization", "Bearer " + OAUTH_KEY);
 			httpWebRequest.SetRequestHeader("X-Modio-Platform", "windows");
 			httpWebRequest.SetRequestHeader("X-Modio-Portal", "steam");
