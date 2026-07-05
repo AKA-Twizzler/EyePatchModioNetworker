@@ -597,7 +597,44 @@ public class MainClass : MelonMod
 		{
 			foreach (ModInfo subMod in subscribedMods)
 			{
-				if (subMod.modId == installedMod.modId)
+				bool matches = false;
+
+				// Strategy 1: Match by numericalId (most reliable)
+				if (!string.IsNullOrEmpty(installedMod.numericalId) &&
+					!string.IsNullOrEmpty(subMod.numericalId) &&
+					installedMod.numericalId == subMod.numericalId)
+				{
+					matches = true;
+				}
+
+				// Strategy 2: Match by fileName (installed dl filename vs subscription filename)
+				if (!matches && !string.IsNullOrEmpty(installedMod.fileName) &&
+					!string.IsNullOrEmpty(subMod.fileName) &&
+					installedMod.fileName == subMod.fileName)
+				{
+					matches = true;
+				}
+
+				// Strategy 3: Match by modId (URL slug) — fallback
+				if (!matches && !string.IsNullOrEmpty(installedMod.modId) &&
+					!string.IsNullOrEmpty(subMod.modId) &&
+					installedMod.modId == subMod.modId)
+				{
+					matches = true;
+				}
+
+				// Strategy 4: Try to match installed mod's fileName (zip) against subscription patterns
+				if (!matches && !string.IsNullOrEmpty(installedMod.fileName))
+				{
+					string fileNameLower = installedMod.fileName.ToLowerInvariant();
+					string subModIdLower = subMod.modId.ToLowerInvariant();
+					if (fileNameLower.Contains(subModIdLower) || subModIdLower.Contains(fileNameLower))
+					{
+						matches = true;
+					}
+				}
+
+				if (matches)
 				{
 					bool updated = false;
 					if (string.IsNullOrEmpty(installedMod.numericalId) && !string.IsNullOrEmpty(subMod.numericalId))
@@ -775,69 +812,77 @@ public class MainClass : MelonMod
 		{
 		}
 		ModInfo.requestSize = num;
-		foreach (dynamic item2 in val["data"])
-		{
-			if (SafeInt(item2, "game_id") != 3809)
-			{
-				continue;
-			}
-			string text2 = (string)item2["profile_url"];
-			string numericalId = ((string)item2["id"]) ?? "";
-			string modName = (string)item2["name"];
-			string modSummary = (string)item2["summary"];
-			string author = (string)item2["submitted_by"]["username"];
-			string thumbnailLink = (string)item2["logo"]["thumb_640x360"];
-			string text3 = text2.Split('/')[^1];
-			bool flag = true;
-			int num4 = 0;
-			int num5 = 0;
-			foreach (dynamic item3 in item2["platforms"])
-			{
-				if ((string)item3["platform"] == "windows")
-				{
-					int num6 = SafeInt(item3, "modfile_live");
-					num4 = num6;
-					break;
-				}
-			}
-			foreach (dynamic item4 in item2["platforms"])
-			{
-				if ((string)item4["platform"] == "android")
-				{
-					int num7 = SafeInt(item4, "modfile_live");
-					num5 = num7;
-					break;
-				}
-			}
-			if (num4 != 0 && num5 != 0 && num4 == num5)
-			{
-				flag = false;
-			}
-			if (SafeInt(item2, "status") == 3)
-			{
-				flag = false;
-			}
-			ModInfo modInfo = ModInfo.MakeFromDynamic(item2["modfile"], text3);
-			modInfo.isValidMod = false;
-			modInfo.mature = SafeInt(item2, "maturity_option") > 0;
-			modInfo.modName = modName;
-			modInfo.thumbnailLink = thumbnailLink;
-			modInfo.modSummary = modSummary;
-			modInfo.numericalId = numericalId;
-			modInfo.author = author;
-			foreach (dynamic item5 in item2["tags"])
-			{
-				modInfo.tags.Add((string)item5["name"]);
-			}
-			if (flag)
-			{
-				modInfo.androidDownloadLink = string.Format("{0}{1}/files/{2}/download", ModFileManager.API_PATH, (object?)item2["id"], num5);
-				modInfo.windowsDownloadLink = string.Format("{0}{1}/files/{2}/download", ModFileManager.API_PATH, (object?)item2["id"], num4);
-				modInfo.isValidMod = true;
-			}
-			ReceiveSubModInfo(modInfo);
-			NetworkerMenuController.modIoRetrieved.Add(modInfo);
-		}
+        foreach (dynamic item2 in val["data"])
+        {
+            try
+            {
+                if (SafeInt(item2, "game_id") != 3809)
+                {
+                    continue;
+                }
+                string text2 = (string)item2["profile_url"];
+                string numericalId = ((string)item2["id"]) ?? "";
+                string modName = (string)item2["name"];
+                string modSummary = (string)item2["summary"];
+                string author = (string)item2["submitted_by"]["username"];
+                string thumbnailLink = (string)item2["logo"]["thumb_640x360"];
+                string text3 = text2.Split('/')[^1];
+                bool flag = true;
+                int num4 = 0;
+                int num5 = 0;
+                foreach (dynamic item3 in item2["platforms"])
+                {
+                    if ((string)item3["platform"] == "windows")
+                    {
+                        int num6 = SafeInt(item3, "modfile_live");
+                        num4 = num6;
+                        break;
+                    }
+                }
+                foreach (dynamic item4 in item2["platforms"])
+                {
+                    if ((string)item4["platform"] == "android")
+                    {
+                        int num7 = SafeInt(item4, "modfile_live");
+                        num5 = num7;
+                        break;
+                    }
+                }
+                if (num4 != 0 && num5 != 0 && num4 == num5)
+                {
+                    flag = false;
+                }
+                if (SafeInt(item2, "status") == 3)
+                {
+                    flag = false;
+                }
+                ModInfo modInfo = ModInfo.MakeFromDynamic(item2["modfile"], text3);
+                modInfo.isValidMod = false;
+                modInfo.mature = SafeInt(item2, "maturity_option") > 0;
+                modInfo.modName = modName;
+                modInfo.thumbnailLink = thumbnailLink;
+                modInfo.modSummary = modSummary;
+                modInfo.numericalId = numericalId;
+                modInfo.author = author;
+                foreach (dynamic item5 in item2["tags"])
+                {
+                    modInfo.tags.Add((string)item5["name"]);
+                }
+                if (flag)
+                {
+                    modInfo.androidDownloadLink = string.Format("{0}{1}/files/{2}/download", ModFileManager.API_PATH, (object?)item2["id"], num5);
+                    modInfo.windowsDownloadLink = string.Format("{0}{1}/files/{2}/download", ModFileManager.API_PATH, (object?)item2["id"], num4);
+                    modInfo.isValidMod = true;
+                }
+                ReceiveSubModInfo(modInfo);
+                NetworkerMenuController.modIoRetrieved.Add(modInfo);
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Error($"Failed to parse subscription mod: {ex.Message}");
+                continue;
+            }
+        }
 		subsShown += num3;
 		if (subTotal - subsShown > 0)
 		{
