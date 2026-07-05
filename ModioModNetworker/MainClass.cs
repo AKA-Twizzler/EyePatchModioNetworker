@@ -54,6 +54,9 @@ public class MainClass : MelonMod
 
 	private static List<InstalledModInfo> outOfDateModInfos = new List<InstalledModInfo>();
 
+	// Cache file for subscription data to persist across restarts
+	private static readonly string subDataCachePath = Path.Combine(MelonLoader.Utils.MelonEnvironment.UserDataDirectory, "ModioModNetworker", "subscription_cache.json");
+
 	public static bool warehouseReloadRequested = false;
 
 	public static List<string> warehousePalletReloadTargets = new List<string>();
@@ -526,6 +529,136 @@ public class MainClass : MelonMod
 		subscribedMods.Add(modInfo);
 	}
 
+	public static void LoadSubscriptionCache()
+	{
+		try
+		{
+			if (!File.Exists(subDataCachePath))
+			{
+				MelonLoader.MelonLogger.Msg("[Diag] Cache: No cache file found at " + subDataCachePath);
+				return;
+			}
+
+			string json = File.ReadAllText(subDataCachePath);
+			var cacheList = Newtonsoft.Json.JsonConvert.DeserializeObject<List<Dictionary<string, string>>>(json);
+			if (cacheList == null || cacheList.Count == 0)
+			{
+				MelonLoader.MelonLogger.Msg("[Diag] Cache: Empty cache file");
+				return;
+			}
+
+			// Populate ModInfo objects from cache and add to totalInstalled
+			int count = 0;
+			foreach (var entry in cacheList)
+			{
+				if (entry.TryGetValue("modId", out string modId) && !string.IsNullOrEmpty(modId))
+				{
+					ModInfo cachedMod = new ModInfo();
+					cachedMod.modId = modId;
+					cachedMod.numericalId = entry.GetValueOrDefault("numericalId", null);
+					cachedMod.modName = entry.GetValueOrDefault("modName", null);
+					cachedMod.thumbnailLink = entry.GetValueOrDefault("thumbnailLink", null);
+					if (float.TryParse(entry.GetValueOrDefault("fileSizeKB", "0"), out float fs))
+						cachedMod.fileSizeKB = fs;
+
+					// Try to match with installed mods
+					foreach (ModInfo installedMod in NetworkerMenuController.totalInstalled)
+					{
+						if (installedMod.modId == modId)
+						{
+							bool updated = false;
+							if (string.IsNullOrEmpty(installedMod.numericalId) && !string.IsNullOrEmpty(cachedMod.numericalId))
+							{ installedMod.numericalId = cachedMod.numericalId; updated = true; }
+							if (string.IsNullOrEmpty(installedMod.modName) && !string.IsNullOrEmpty(cachedMod.modName))
+							{ installedMod.modName = cachedMod.modName; updated = true; }
+							if (string.IsNullOrEmpty(installedMod.thumbnailLink) && !string.IsNullOrEmpty(cachedMod.thumbnailLink))
+							{ installedMod.thumbnailLink = cachedMod.thumbnailLink; updated = true; }
+							if (installedMod.fileSizeKB == 0f && cachedMod.fileSizeKB > 0f)
+							{ installedMod.fileSizeKB = cachedMod.fileSizeKB; updated = true; }
+							if (updated) count++;
+							break;
+						}
+					}
+				}
+			}
+			MelonLoader.MelonLogger.Msg($"[Diag] Cache: Loaded {cacheList.Count} entries, cross-referenced {count} installed mods");
+		}
+		catch (Exception ex)
+		{
+			MelonLoader.MelonLogger.Error($"[Diag] Cache: Failed to load: {ex.Message}");
+		}
+	}
+
+	public static void CrossReferenceInstalledMods()
+	{
+		MelonLoader.MelonLogger.Msg("[Diag] Cross-reference: Checking installed mods against subscribedMods...");
+		int count = 0;
+		foreach (ModInfo installedMod in NetworkerMenuController.totalInstalled)
+		{
+			foreach (ModInfo subMod in subscribedMods)
+			{
+				if (subMod.modId == installedMod.modId)
+				{
+					bool updated = false;
+					if (string.IsNullOrEmpty(installedMod.numericalId) && !string.IsNullOrEmpty(subMod.numericalId))
+					{
+						installedMod.numericalId = subMod.numericalId;
+						updated = true;
+					}
+					if (string.IsNullOrEmpty(installedMod.modName) && !string.IsNullOrEmpty(subMod.modName))
+					{
+						installedMod.modName = subMod.modName;
+						updated = true;
+					}
+					if (string.IsNullOrEmpty(installedMod.thumbnailLink) && !string.IsNullOrEmpty(subMod.thumbnailLink))
+					{
+						installedMod.thumbnailLink = subMod.thumbnailLink;
+						updated = true;
+					}
+					if (installedMod.fileSizeKB == 0f && subMod.fileSizeKB > 0f)
+					{
+						installedMod.fileSizeKB = subMod.fileSizeKB;
+						updated = true;
+					}
+					if (updated) count++;
+					break;
+				}
+			}
+		}
+		MelonLoader.MelonLogger.Msg($"[Diag] Cross-reference: Updated {count} installed mods from subscription data.");
+	}
+
+	public static void SaveSubscriptionCache()
+	{
+		try
+		{
+			string dirPath = Path.GetDirectoryName(subDataCachePath);
+			if (!Directory.Exists(dirPath))
+				Directory.CreateDirectory(dirPath);
+
+			// Build a simple JSON with just the fields we need for cross-reference
+			var cacheList = new List<Dictionary<string, string>>();
+			foreach (ModInfo mod in subscribedMods)
+			{
+				var entry = new Dictionary<string, string>();
+				entry["modId"] = mod.modId ?? "";
+				entry["numericalId"] = mod.numericalId ?? "";
+				entry["modName"] = mod.modName ?? "";
+				entry["thumbnailLink"] = mod.thumbnailLink ?? "";
+				entry["fileSizeKB"] = mod.fileSizeKB.ToString();
+				cacheList.Add(entry);
+			}
+
+			string json = Newtonsoft.Json.JsonConvert.SerializeObject(cacheList, Newtonsoft.Json.Formatting.Indented);
+			File.WriteAllText(subDataCachePath, json);
+			MelonLoader.MelonLogger.Msg($"[Diag] Cache: Saved {cacheList.Count} subscription entries to {subDataCachePath}");
+		}
+		catch (Exception ex)
+		{
+			MelonLoader.MelonLogger.Error($"[Diag] Cache: Failed to save: {ex.Message}");
+		}
+	}
+
 	public static void PopulateSubscriptions()
 	{
 		refreshSubscribedModsRequested = true;
@@ -719,10 +852,17 @@ public class MainClass : MelonMod
 		{
 			MelonLogger.Error("Failed to process subscriptions: " + e);
 		}
+		// Now that subscriptions are loaded, cross-reference with installed mods
+		CrossReferenceInstalledMods();
+		// Save subscription data to cache for next startup
+		SaveSubscriptionCache();
 	}
 
 	public void PopulateInstalledMods(string directory)
 	{
+		// Load cached subscription data before scanning installed mods
+		LoadSubscriptionCache();
+
 		List<DirectoryInfo> list = new List<DirectoryInfo>();
 		try
 		{
@@ -843,24 +983,6 @@ public class MainClass : MelonMod
 				if (value != 0)
 					modInfo.numericalId = value.ToString();
 				// If value is 0, numericalId stays null until PopulateFromInfoString or other source sets it
-				if (string.IsNullOrEmpty(modInfo.numericalId) || string.IsNullOrEmpty(modInfo.modName))
-				{
-					foreach (ModInfo subMod in MainClass.subscribedMods)
-					{
-						if (subMod.modId == modId)
-						{
-							if (string.IsNullOrEmpty(modInfo.numericalId) && !string.IsNullOrEmpty(subMod.numericalId))
-								modInfo.numericalId = subMod.numericalId;
-							if (string.IsNullOrEmpty(modInfo.modName) && !string.IsNullOrEmpty(subMod.modName))
-								modInfo.modName = subMod.modName;
-							if (string.IsNullOrEmpty(modInfo.thumbnailLink) && !string.IsNullOrEmpty(subMod.thumbnailLink))
-								modInfo.thumbnailLink = subMod.thumbnailLink;
-							if (modInfo.fileSizeKB == 0f && subMod.fileSizeKB > 0f)
-								modInfo.fileSizeKB = subMod.fileSizeKB;
-							break;
-						}
-					}
-				}
 				modInfo.structureVersion = ModInfo.globalStructureVersion;
 				if (text2 != "")
 				{
