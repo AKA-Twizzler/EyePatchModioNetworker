@@ -26,6 +26,7 @@ using ModioModNetworker.Queue;
 using ModioModNetworker.UI;
 using ModioModNetworker.Utilities;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using UnityEngine;
 using UnityEngine.AddressableAssets.ResourceLocators;
 
@@ -756,11 +757,20 @@ public class MainClass : MelonMod
 				int value = 0;
 				foreach (dynamic item2 in val["objects"]["2"]["targets"])
 				{
-					string text3 = item2.ToString();
-					if (text3.Contains("networker"))
+					var prop = item2 as JProperty;
+					if (prop != null && prop.Name.Contains("networker"))
 					{
-						string[] array = text3.Split("\": {");
-						text2 = array[0].Replace("\"", "");
+						text2 = prop.Name;
+					}
+					else if (prop == null)
+					{
+						// Fallback: try the old toString approach
+						string text3 = item2.ToString();
+						if (text3.Contains("networker"))
+						{
+							string[] array = text3.Split("\": {");
+							text2 = array[0].Replace("\"", "");
+						}
 					}
 				}
 				string windowsDownloadLink = "";
@@ -797,11 +807,48 @@ public class MainClass : MelonMod
 				modInfo.androidDownloadLink = androidDownloadLink;
 				modInfo.windowsDownloadLink = windowsDownloadLink;
 				modInfo.modId = modId;
+				// If pc/android refs failed, try to get numericalId from other sources
+				if (value == 0)
+				{
+					// Try from info string if available
+					if (text2 != "")
+					{
+						try {
+							// The numericalId might be in a target ref value
+							// Check if we have any target with a valid modId
+							foreach (dynamic item2 in val["objects"]["2"]["targets"])
+							{
+								try
+								{
+									int refNum = (int)item2["ref"];
+									if (refNum != 0)
+									{
+										// Found a valid ref
+										// modId can be read from objects[refNum]["modId"]
+										int tryModId = (int)val["objects"][refNum.ToString()]["modId"];
+										if (tryModId != 0)
+										{
+											value = tryModId;
+											break;
+										}
+									}
+								}
+								catch { }
+							}
+						}
+						catch { }
+					}
+				}
 				modInfo.numericalId = value.ToString() ?? "";
 				modInfo.structureVersion = ModInfo.globalStructureVersion;
 				if (text2 != "")
 				{
 					modInfo.PopulateFromInfoString(text2);
+				}
+				// Fallback: if modName wasn't set from info string, use modId (title from manifest)
+				if (string.IsNullOrEmpty(modInfo.modName))
+				{
+					modInfo.modName = modId;
 				}
 				NetworkerMenuController.totalInstalled.Add(modInfo);
 				installedMods.Add(modInfo);

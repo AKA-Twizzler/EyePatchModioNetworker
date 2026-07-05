@@ -5,5 +5,5 @@ namespace ModioModNetworker;
 [StructLayout(LayoutKind.Sequential, Size = 1)]
 public struct ModioModNetworkerUpdaterVersion
 {
-	public const string versionString = "2.8.5";
+	public const string versionString = "2.8.6";
 }

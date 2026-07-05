@@ -26,6 +26,9 @@ public class ThumbnailThreader
 			return;
 		}
 		UnityWebRequest webRequest = UnityWebRequestTexture.GetTexture(url);
+		webRequest.SetRequestHeader("Authorization", "Bearer " + ModFileManager.OAUTH_KEY);
+		webRequest.SetRequestHeader("X-Modio-Platform", "windows");
+		webRequest.SetRequestHeader("X-Modio-Portal", "steam");
 		UnityWebRequestAsyncOperation val = webRequest.SendWebRequest();
 		((AsyncOperation)val).m_completeCallback = ((AsyncOperation)val).m_completeCallback + new Action<AsyncOperation>(delegate
 		{
