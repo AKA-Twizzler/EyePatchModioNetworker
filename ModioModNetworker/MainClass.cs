@@ -442,6 +442,8 @@ public class MainClass : MelonMod
 					{
 						NetworkerMenuController.instance.Refresh();
 					}
+					// Re-apply cross-reference data to newly scanned mods
+					CrossReferenceInstalledMods();
 				});
 				handlingInstalled = false;
 			});
@@ -917,6 +919,8 @@ public class MainClass : MelonMod
 		CrossReferenceInstalledMods();
 		// Save subscription data to cache for next startup
 		SaveSubscriptionCache();
+		// Refresh the UI to show updated cross-referenced data
+		NetworkerMenuController.instance.Refresh();
 	}
 
 	public void PopulateInstalledMods(string directory)
@@ -1070,6 +1074,8 @@ public class MainClass : MelonMod
 			{
 			}
 		}
+		// Re-apply cache data now that totalInstalled is populated
+		CrossReferenceInstalledMods();
 	}
 
 	public void OnStartServer()
