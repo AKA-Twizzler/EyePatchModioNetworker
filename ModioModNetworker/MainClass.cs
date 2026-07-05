@@ -20,13 +20,12 @@ using LabFusion.UI.Popups;
 using LabFusion.Utilities;
 using MelonLoader;
 using MelonLoader.Preferences;
-using ModIoModNetworker.Ui;
+using ModioModNetworker.UI;
 using ModioModNetworker.Data;
 using ModioModNetworker.Queue;
 using ModioModNetworker.UI;
 using ModioModNetworker.Utilities;
 using Newtonsoft.Json;
-using ThunderstoreModAssistant.Utilities;
 using UnityEngine;
 using UnityEngine.AddressableAssets.ResourceLocators;
 
@@ -168,6 +167,10 @@ public class MainClass : MelonMod
 		NetworkerAssets.LoadAssetsUI(bundle);
 		PrepareModFiles();
 		string text = ReadAuthKey();
+		if (!string.IsNullOrEmpty(text))
+		{
+			ModFileManager.OAUTH_KEY = text;
+		}
 		blacklistedModIoIds = ReadBlacklist();
 		MelonLogger.Msg("Loaded blacklist with " + blacklistedModIoIds.Count + " entries.");
 		ModIOSettings.LoadToken((Action<string>)OnLoadToken);

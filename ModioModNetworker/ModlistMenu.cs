@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using BoneLib.BoneMenu;
 using BoneLib.BoneMenu.UI;
 using HarmonyLib;
-using ModIoModNetworker.Ui;
+using ModioModNetworker.UI;
 using ModioModNetworker.Data;
 using ModioModNetworker.Utilities;
 using UnityEngine;

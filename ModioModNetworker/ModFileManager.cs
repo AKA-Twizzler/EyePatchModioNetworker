@@ -12,7 +12,7 @@ using Il2CppSLZ.Marrow.Pool;
 using Il2CppSLZ.Marrow.SceneStreaming;
 using Il2CppSLZ.Marrow.Warehouse;
 using MelonLoader;
-using ModIoModNetworker.Ui;
+using ModioModNetworker.UI;
 using ModioModNetworker.Data;
 using ModioModNetworker.UI;
 using Newtonsoft.Json;
@@ -215,6 +215,8 @@ public class ModFileManager
 			ServerCertificateCustomValidationCallback = (HttpRequestMessage httpRequestMessage, X509Certificate2? cert, X509Chain? cetChain, SslPolicyErrors policyErrors) => true
 		});
 		client.DefaultRequestHeaders.Add("Authorization", "Bearer " + OAUTH_KEY);
+		client.DefaultRequestHeaders.Add("X-Modio-Platform", "windows");
+		client.DefaultRequestHeaders.Add("X-Modio-Portal", "steam");
 		using (HttpResponseMessage response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead))
 		{
 			using Stream streamToReadFrom = await response.Content.ReadAsStreamAsync();
@@ -273,6 +275,8 @@ public class ModFileManager
 			fetchingSubscriptions = true;
 			UnityWebRequest httpWebRequest = UnityWebRequest.Get("https://g-3809.modapi.io/v1/me/subscribed?_offset=" + shown + "&limit=400");
 			httpWebRequest.SetRequestHeader("Authorization", "Bearer " + OAUTH_KEY);
+			httpWebRequest.SetRequestHeader("X-Modio-Platform", "windows");
+			httpWebRequest.SetRequestHeader("X-Modio-Portal", "steam");
 			UnityWebRequestAsyncOperation val = httpWebRequest.SendWebRequest();
 		((AsyncOperation)val).m_completeCallback = ((AsyncOperation)val).m_completeCallback + new Action<AsyncOperation>(delegate
 		{
@@ -294,8 +298,10 @@ public class ModFileManager
 				text = "";
 			}
 			SpotlightOverride.LoadFromRegularURL();
-			UnityWebRequest httpWebRequest = UnityWebRequest.Get($"https://mod.io/v1/games/@bonelab/mods?_limit=100&_offset={offset}&_sort=-popular" + text);
+			UnityWebRequest httpWebRequest = UnityWebRequest.Get($"{API_PATH}?_limit=100&_offset={offset}&_sort=-downloads_total" + text);
 			httpWebRequest.SetRequestHeader("Authorization", "Bearer " + OAUTH_KEY);
+			httpWebRequest.SetRequestHeader("X-Modio-Platform", "windows");
+			httpWebRequest.SetRequestHeader("X-Modio-Portal", "steam");
 			UnityWebRequestAsyncOperation val = httpWebRequest.SendWebRequest();
 		((AsyncOperation)val).m_completeCallback = ((AsyncOperation)val).m_completeCallback + new Action<AsyncOperation>(delegate
 		{
@@ -312,6 +318,8 @@ public class ModFileManager
 		UnityWebRequest httpWebRequest = UnityWebRequest.Get(text);
 		httpWebRequest.method = "POST";
 		httpWebRequest.SetRequestHeader("Authorization", "Bearer " + OAUTH_KEY);
+		httpWebRequest.SetRequestHeader("X-Modio-Platform", "windows");
+		httpWebRequest.SetRequestHeader("X-Modio-Portal", "steam");
 		httpWebRequest.SetRequestHeader("Content-Type", "application/x-www-form-urlencoded");
 		UnityWebRequestAsyncOperation val = httpWebRequest.SendWebRequest();
 		((AsyncOperation)val).m_completeCallback = ((AsyncOperation)val).m_completeCallback + new Action<AsyncOperation>(delegate
@@ -344,6 +352,8 @@ public class ModFileManager
 		UnityWebRequest val = UnityWebRequest.Get(text);
 		val.method = "DELETE";
 		val.SetRequestHeader("Authorization", "Bearer " + OAUTH_KEY);
+		val.SetRequestHeader("X-Modio-Platform", "windows");
+		val.SetRequestHeader("X-Modio-Portal", "steam");
 		val.SetRequestHeader("Content-Type", "application/x-www-form-urlencoded");
 		UnityWebRequestAsyncOperation val2 = val.SendWebRequest();
 		((AsyncOperation)val2).m_completeCallback = ((AsyncOperation)val2).m_completeCallback + new Action<AsyncOperation>(delegate
@@ -481,6 +491,8 @@ public class ModFileManager
 		string text = API_PATH + mod + "/files";
 		UnityWebRequest httpWebRequest = UnityWebRequest.Get(text);
 		httpWebRequest.SetRequestHeader("Authorization", "Bearer " + OAUTH_KEY);
+		httpWebRequest.SetRequestHeader("X-Modio-Platform", "windows");
+		httpWebRequest.SetRequestHeader("X-Modio-Portal", "steam");
 		UnityWebRequestAsyncOperation val = httpWebRequest.SendWebRequest();
 		((AsyncOperation)val).m_completeCallback = ((AsyncOperation)val).m_completeCallback + new Action<AsyncOperation>(delegate
 		{
@@ -510,6 +522,8 @@ public class ModFileManager
 			string text = API_PATH + mod;
 			UnityWebRequest httpWebRequest = UnityWebRequest.Get(text);
 			httpWebRequest.SetRequestHeader("Authorization", "Bearer " + OAUTH_KEY);
+			httpWebRequest.SetRequestHeader("X-Modio-Platform", "windows");
+			httpWebRequest.SetRequestHeader("X-Modio-Portal", "steam");
 			UnityWebRequestAsyncOperation val = httpWebRequest.SendWebRequest();
 		((AsyncOperation)val).m_completeCallback = ((AsyncOperation)val).m_completeCallback + new Action<AsyncOperation>(delegate
 		{
