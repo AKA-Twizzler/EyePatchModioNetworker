@@ -843,6 +843,24 @@ public class MainClass : MelonMod
 				if (value != 0)
 					modInfo.numericalId = value.ToString();
 				// If value is 0, numericalId stays null until PopulateFromInfoString or other source sets it
+				if (string.IsNullOrEmpty(modInfo.numericalId) || string.IsNullOrEmpty(modInfo.modName))
+				{
+					foreach (ModInfo subMod in MainClass.subscribedMods)
+					{
+						if (subMod.modId == modId)
+						{
+							if (string.IsNullOrEmpty(modInfo.numericalId) && !string.IsNullOrEmpty(subMod.numericalId))
+								modInfo.numericalId = subMod.numericalId;
+							if (string.IsNullOrEmpty(modInfo.modName) && !string.IsNullOrEmpty(subMod.modName))
+								modInfo.modName = subMod.modName;
+							if (string.IsNullOrEmpty(modInfo.thumbnailLink) && !string.IsNullOrEmpty(subMod.thumbnailLink))
+								modInfo.thumbnailLink = subMod.thumbnailLink;
+							if (modInfo.fileSizeKB == 0f && subMod.fileSizeKB > 0f)
+								modInfo.fileSizeKB = subMod.fileSizeKB;
+							break;
+						}
+					}
+				}
 				modInfo.structureVersion = ModInfo.globalStructureVersion;
 				if (text2 != "")
 				{

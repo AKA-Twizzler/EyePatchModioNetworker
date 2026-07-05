@@ -27,36 +27,52 @@ public class ThumbnailThreader
 			return;
 		}
 		MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: Starting download from URL: {url}");
-		UnityWebRequest webRequest = UnityWebRequestTexture.GetTexture(url);
-		UnityWebRequestAsyncOperation val = webRequest.SendWebRequest();
-		((AsyncOperation)val).m_completeCallback = ((AsyncOperation)val).m_completeCallback + new Action<AsyncOperation>(delegate
-		{
-			ThumbnailCompletionJob item = new ThumbnailCompletionJob
-			{
-				callback = delegate
-				{
-					try
-					{
-						if ((int)webRequest.result == 1)
-						{
-							DownloadHandlerTexture val2 = ((Il2CppObjectBase)webRequest.downloadHandler).Cast<DownloadHandlerTexture>();
-							Texture texture = (Texture)(object)val2.texture;
-							MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: Download succeeded. Texture: {texture.name}, Size: {texture.width}x{texture.height}");
-							action(texture);
-						}
-						else
-						{
-							MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: Download failed. Result: {(UnityWebRequest.Result)webRequest.result}, Error: {webRequest.error}, URL: {url}");
-						}
-					}
-					catch (Exception ex)
-					{
-						MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: Exception during download processing: {ex.Message}");
-					}
-				}
-			};
-			thumbnailCompletionJobs.Enqueue(item);
-		});
 
+		// Try both CDN domains in case one is blocked
+		string[] urlsToTry = new string[] { url };
+		if (url.Contains("thumb.modcdn.io"))
+		{
+			string altUrl = url.Replace("thumb.modcdn.io", "assets.modcdn.io");
+			MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: Also trying alt CDN: {altUrl}");
+			urlsToTry = new string[] { url, altUrl };
+		}
+
+		foreach (string tryUrl in urlsToTry)
+		{
+			UnityWebRequest webRequest = UnityWebRequest.Get(tryUrl);
+			DownloadHandlerTexture handler = new DownloadHandlerTexture(true);
+			webRequest.downloadHandler = handler;
+			webRequest.SetRequestHeader("User-Agent", "ModioModNetworker/2.8.10");
+			UnityWebRequestAsyncOperation val = webRequest.SendWebRequest();
+			((AsyncOperation)val).m_completeCallback = ((AsyncOperation)val).m_completeCallback + new Action<AsyncOperation>(delegate
+			{
+				ThumbnailCompletionJob item = new ThumbnailCompletionJob
+				{
+					callback = delegate
+					{
+						try
+						{
+							if ((int)webRequest.result == 1)
+							{
+								DownloadHandlerTexture val2 = ((Il2CppObjectBase)webRequest.downloadHandler).Cast<DownloadHandlerTexture>();
+								Texture texture = (Texture)(object)val2.texture;
+								MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: Download succeeded. Texture: {texture.name}, Size: {texture.width}x{texture.height}");
+								action(texture);
+							}
+							else
+							{
+								MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: Download failed. Result: {(UnityWebRequest.Result)webRequest.result}, Error: {webRequest.error}, URL: {tryUrl}");
+								MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: Response code: {webRequest.responseCode}");
+							}
+						}
+						catch (Exception ex)
+						{
+							MelonLoader.MelonLogger.Msg($"[Diag] DownloadThumbnail: Exception during download processing: {ex.Message}");
+						}
+					}
+				};
+				thumbnailCompletionJobs.Enqueue(item);
+			});
+		}
 	}
 }
