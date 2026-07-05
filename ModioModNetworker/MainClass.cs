@@ -163,7 +163,8 @@ public class MainClass : MelonMod
 		string text = ReadAuthKey();
 		if (!string.IsNullOrEmpty(text))
 		{
-			ModFileManager.OAUTH_KEY = text;
+			MelonLogger.Msg("Found auth.txt token - bypassing Fusion 5-digit code login");
+			OnLoadToken(text);
 		}
 		blacklistedModIoIds = ReadBlacklist();
 		MelonLogger.Msg("Loaded blacklist with " + blacklistedModIoIds.Count + " entries.");
