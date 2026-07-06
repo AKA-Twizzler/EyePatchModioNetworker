@@ -816,11 +816,14 @@ public class MainClass : MelonMod
 			MelonLogger.Msg("No subscriptions found!");
 			return;
 		}
-		foreach (dynamic item in val["data"])
+		if (val["data"] != null)
 		{
-			if (SafeInt(item, "game_id") == 3809)
+			foreach (dynamic item in val["data"])
 			{
-				num++;
+				if (SafeInt(item, "game_id") == 3809)
+				{
+					num++;
+				}
 			}
 		}
 		desiredSubs += num;
@@ -829,40 +832,48 @@ public class MainClass : MelonMod
 		{
 		}
 		ModInfo.requestSize = num;
-        foreach (dynamic item2 in val["data"])
+        if (val["data"] != null)
         {
-            try
+            foreach (dynamic item2 in val["data"])
             {
-                if (SafeInt(item2, "game_id") != 3809)
+                try
                 {
-                    continue;
-                }
-                string text2 = (string)item2["profile_url"];
-                string numericalId = ((string)item2["id"]) ?? "";
-                string modName = (string)item2["name"];
-                string modSummary = (string)item2["summary"];
-                string author = (string)item2["submitted_by"]["username"];
-                string thumbnailLink = (string)item2["logo"]["thumb_640x360"];
-                string text3 = text2.Split('/')[^1];
+                    if (SafeInt(item2, "game_id") != 3809)
+                    {
+                        continue;
+                    }
+                    string text2 = (string)item2["profile_url"];
+                    string numericalId = ((string)item2["id"]) ?? "";
+                    string modName = (string)item2["name"];
+                    string modSummary = (string)item2["summary"];
+                    var submittedBy = item2["submitted_by"];
+                    string author = submittedBy != null ? (string)submittedBy["username"] : "";
+                    var logo = item2["logo"];
+                    string thumbnailLink = logo != null ? (string)logo["thumb_640x360"] : "";
+                    string text3 = !string.IsNullOrEmpty(text2) ? text2.Split('/')[^1] : "";
                 bool flag = true;
                 int num4 = 0;
                 int num5 = 0;
-                foreach (dynamic item3 in item2["platforms"])
+                var platforms = item2["platforms"];
+                if (platforms != null)
                 {
-                    if ((string)item3["platform"] == "windows")
+                    foreach (dynamic item3 in platforms)
                     {
-                        int num6 = SafeInt(item3, "modfile_live");
-                        num4 = num6;
-                        break;
+                        if ((string)item3["platform"] == "windows")
+                        {
+                            int num6 = SafeInt(item3, "modfile_live");
+                            num4 = num6;
+                            break;
+                        }
                     }
-                }
-                foreach (dynamic item4 in item2["platforms"])
-                {
-                    if ((string)item4["platform"] == "android")
+                    foreach (dynamic item4 in platforms)
                     {
-                        int num7 = SafeInt(item4, "modfile_live");
-                        num5 = num7;
-                        break;
+                        if ((string)item4["platform"] == "android")
+                        {
+                            int num7 = SafeInt(item4, "modfile_live");
+                            num5 = num7;
+                            break;
+                        }
                     }
                 }
                 if (num4 != 0 && num5 != 0 && num4 == num5)
@@ -881,9 +892,13 @@ public class MainClass : MelonMod
                 modInfo.modSummary = modSummary;
                 modInfo.numericalId = numericalId;
                 modInfo.author = author;
-                foreach (dynamic item5 in item2["tags"])
+                var tags = item2["tags"];
+                if (tags != null)
                 {
-                    modInfo.tags.Add((string)item5["name"]);
+                    foreach (dynamic item5 in tags)
+                    {
+                        modInfo.tags.Add((string)item5["name"]);
+                    }
                 }
                 if (flag)
                 {
@@ -910,6 +925,7 @@ public class MainClass : MelonMod
 			subsRefreshing = true;
 		}
 		}
+		}
 		catch (Exception e)
 		{
 			MelonLogger.Error("Failed to process subscriptions: " + e);
@@ -919,7 +935,8 @@ public class MainClass : MelonMod
 		// Save subscription data to cache for next startup
 		SaveSubscriptionCache();
 		// Refresh the UI to show updated cross-referenced data
-		NetworkerMenuController.instance.Refresh();
+		if (NetworkerMenuController.instance != null)
+			NetworkerMenuController.instance.Refresh();
 	}
 
 	public void PopulateInstalledMods(string directory)
