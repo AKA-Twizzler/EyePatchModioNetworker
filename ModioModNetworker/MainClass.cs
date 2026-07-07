@@ -189,12 +189,22 @@ public class MainClass : MelonMod
 				palletLock = false;
 				LevelHoldQueue.CheckValid(s._id);
 				SpawnableHoldQueue.CheckValid(s._id);
-				// Only force avatar refresh for local player
-				if (NetworkPlayerManager.TryGetPlayer((byte)PlayerIDManager.LocalID, out var localPlayer))
+				// Only force avatar refresh for local player (safely - may not be initialized during AssetWarehouse startup)
+				try
 				{
-					var field = localPlayer.AvatarSetter.GetType().GetField("_isAvatarDirty", BindingFlags.Instance | BindingFlags.NonPublic);
-					if (field != null)
-						field.SetValue(localPlayer.AvatarSetter, true);
+					if (PlayerIDManager.LocalID != null)
+					{
+						if (NetworkPlayerManager.TryGetPlayer((byte)PlayerIDManager.LocalID, out var localPlayer))
+						{
+							var field = localPlayer.AvatarSetter.GetType().GetField("_isAvatarDirty", BindingFlags.Instance | BindingFlags.NonPublic);
+							if (field != null)
+								field.SetValue(localPlayer.AvatarSetter, true);
+						}
+					}
+				}
+				catch (Exception ex)
+				{
+					MelonLogger.Warning("_isAvatarDirty: " + ex.Message);
 				}
 			});
 
