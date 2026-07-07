@@ -221,7 +221,13 @@ public class DownloadAction
 			}
 			manifest["objects"] = objects;
 			string manifestPath = Path.Combine(modFolderPath, barcode + ".manifest");
-			File.WriteAllText(manifestPath, manifest.ToString(Formatting.Indented));
+			string tempManifestPath = manifestPath + ".tmp";
+			File.WriteAllText(tempManifestPath, manifest.ToString(Formatting.Indented));
+			if (File.Exists(manifestPath))
+			{
+				File.Delete(manifestPath);
+			}
+			File.Move(tempManifestPath, manifestPath);
 			MelonLogger.Msg("WriteModListingManifest: Wrote manifest for " + barcode);
 		}
 		catch (Exception ex)

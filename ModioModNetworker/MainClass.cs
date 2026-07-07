@@ -137,8 +137,11 @@ public class MainClass : MelonMod
 
 	private bool assetWarehouseLoaded = false;
 
+	private static int diagUpdateCount = 0;
+
 	public override void OnInitializeMelon()
 	{
+		MelonLogger.Msg("DIAG: MOD INIT START");
 		melonPreferencesCategory = MelonPreferences.CreateCategory("ModioModNetworker");
 		melonPreferencesCategory.SetFilePath(MelonLoader.Utils.MelonEnvironment.UserDataDirectory + "/ModioModNetworker.cfg");
 		modsDirectory = melonPreferencesCategory.CreateEntry<string>("ModDirectoryPath", Application.persistentDataPath + "/Mods", (string)null, (string)null, false, false, (ValueValidator)null, (string)null);
@@ -181,8 +184,10 @@ public class MainClass : MelonMod
 		MultiplayerHooking.OnDisconnected += new ServerEvent(OnDisconnect);
 		MultiplayerHooking.OnStartedServer += new ServerEvent(OnStartServer);
 		NetworkPlayer.OnNetworkRigCreated += OnPlayerRepCreated;
+		MelonLogger.Msg("DIAG: Waiting for AssetWarehouse init...");
 		AssetWarehouse.OnReady(new System.Action(delegate
 		{
+			MelonLogger.Msg("DIAG: OnReady FIRED");
 			AssetWarehouse instance = AssetWarehouse.Instance;
 			instance.OnCrateAdded += new Action<Barcode>(delegate(Barcode s)
 			{
@@ -209,8 +214,10 @@ public class MainClass : MelonMod
 			});
 
 			assetWarehouseLoaded = true;
+			MelonLogger.Msg("DIAG: assetWarehouseLoaded = true");
 			DeleteAllTempMods();
 		}));
+		MelonLogger.Msg("DIAG: OnReady registered");
 		void OnLoadToken(string loadedToken)
 		{
 			ModFileManager.OAUTH_KEY = loadedToken;
@@ -218,6 +225,7 @@ public class MainClass : MelonMod
 			installedMods.Clear();
 			InstalledModInfos.Clear();
 			PopulateInstalledMods(ModFileManager.MOD_FOLDER_PATH);
+			BackfillManifests();
 			loadedInstalled = true;
 			MelonLogger.Msg("Checking mod.io account subscriptions");
 			PopulateSubscriptions();
@@ -274,6 +282,7 @@ public class MainClass : MelonMod
 
 	private void DeleteAllTempMods()
 	{
+		MelonLogger.Msg("DIAG: DeleteAllTempMods start");
 		foreach (ModInfo installedMod in installedMods)
 		{
 			if (installedMod.temp)
@@ -281,10 +290,13 @@ public class MainClass : MelonMod
 				ModFileManager.UnInstallMainThread(installedMod.numericalId);
 			}
 		}
+		MelonLogger.Msg("DIAG: DeleteAllTempMods end");
 	}
 
 	public override void OnUpdate()
 	{
+		if (diagUpdateCount < 5) { MelonLogger.Msg("DIAG: OnUpdate tick " + (diagUpdateCount + 1)); }
+		diagUpdateCount++;
 		foreach (AvatarDownloadBar value3 in AvatarDownloadBar.bars.Values)
 		{
 			value3.Update();
@@ -971,6 +983,7 @@ public class MainClass : MelonMod
 
 	public void PopulateInstalledMods(string directory)
 	{
+		MelonLogger.Msg("DIAG: PopulateInstalledMods start");
 		// Load cached subscription data before scanning installed mods
 		LoadSubscriptionCache();
 
@@ -1207,128 +1220,92 @@ public class MainClass : MelonMod
 						}
 					}
 				}
-				// STEP 2: Check/update manifest (only if not queued for update)
+				// STEP 2: Always rewrite manifest unconditionally
 				if (needsUpdate)
 				{
 					string expectedManifestPath = Path.Combine(modDir, barcode + ".manifest");
-					bool manifestNeedsUpdate = true;
-					if (File.Exists(expectedManifestPath))
-					{
-						try
-						{
-							string existingManifest = File.ReadAllText(expectedManifestPath);
-							JObject manifestObj = JObject.Parse(existingManifest);
-							var targets = manifestObj["objects"]?["2"]?["targets"];
-							if (targets != null)
-							{
-								bool hasValidTarget = false;
-								foreach (var prop in targets.Children<JProperty>())
-								{
-									if (prop.Name == "pc" || prop.Name.Contains("networker"))
-									{
-										string refNum = (string)prop.Value["ref"];
-										if (!string.IsNullOrEmpty(refNum) && manifestObj["objects"]?[refNum]?["modId"] != null)
-										{
-											hasValidTarget = true;
-											break;
-										}
-									}
-								}
-								if (hasValidTarget)
-									manifestNeedsUpdate = false;
-							}
-						}
-						catch { }
-					}
-					if (manifestNeedsUpdate)
-					{
-						string windowsLink = (string)modInfoObj["windowsDownloadLink"] ?? "";
-						string androidLink = (string)modInfoObj["androidDownloadLink"] ?? "";
-						string version = (string)modInfoObj["version"] ?? "0.0.0";
-						string modId = (string)modInfoObj["modId"] ?? "";
-						string modSummary = (string)modInfoObj["modSummary"] ?? "";
-						string thumbnailLink = (string)modInfoObj["thumbnailLink"] ?? "";
+					string windowsLink = (string)modInfoObj["windowsDownloadLink"] ?? "";
+					string androidLink = (string)modInfoObj["androidDownloadLink"] ?? "";
+					string version = (string)modInfoObj["version"] ?? "0.0.0";
+					string modId = (string)modInfoObj["modId"] ?? "";
+					string modSummary = (string)modInfoObj["modSummary"] ?? "";
+					string thumbnailLink = (string)modInfoObj["thumbnailLink"] ?? "";
 					string mature = modInfoObj["mature"]?.ToString() ?? "False";
 					string temp = modInfoObj["temp"]?.ToString() ?? "False";
 					string fileSizeKB = modInfoObj["fileSizeKB"]?.ToString() ?? "0";
 					string fileName = modInfoObj["fileName"]?.ToString() ?? "";
 					string structureVersion = modInfoObj["structureVersion"]?.ToString() ?? "0";
 					string modName = modInfoObj["modName"]?.ToString() ?? "";
-						string modNameSafe = modName.Replace(";", "");
-						string catalogPath = ModFileManager.FindFile(modDir, "catalog.json");
-						long pcModfileId = 0L;
-						long androidModfileId = 0L;
-						try { if (!string.IsNullOrEmpty(windowsLink) && windowsLink.Contains("/files/")) pcModfileId = long.Parse(windowsLink.Split("/files/")[1].Replace("/download", "")); } catch { }
-						try { if (!string.IsNullOrEmpty(androidLink) && androidLink.Contains("/files/")) androidModfileId = long.Parse(androidLink.Split("/files/")[1].Replace("/download", "")); } catch { }
-						long numericalIdLong = long.TryParse(numericalId, out long parsedId) ? parsedId : 0L;
-						JObject manifest = new JObject();
-						JObject objects = new JObject();
-						JObject obj1 = new JObject();
-						obj1["palletBarcode"] = barcode;
-						obj1["palletPath"] = palletPath;
-						obj1["catalogPath"] = !string.IsNullOrEmpty(catalogPath) ? catalogPath : "";
-						objects["1"] = obj1;
-						JObject obj2 = new JObject();
-						obj2["barcode"] = barcode;
-						obj2["version"] = version ?? "0.0.0";
-						obj2["title"] = modId ?? "";
-						obj2["description"] = modSummary ?? "";
-						obj2["thumbnailUrl"] = thumbnailLink ?? "";
-						obj2["author"] = "ModIoModNetworker";
-						JObject targets = new JObject();
-						JObject pcTarget = new JObject();
-						pcTarget["ref"] = "3";
-						pcTarget["type"] = "mod-target-modio#0";
-						targets["pc"] = pcTarget;
-						if (androidModfileId > 0L)
-						{
-							JObject androidTarget = new JObject();
-							androidTarget["ref"] = "4";
-							androidTarget["type"] = "mod-target-modio#0";
-							targets["android"] = androidTarget;
-						}
-						else
-						{
-							JObject androidTarget = new JObject();
-							androidTarget["ref"] = "3";
-							androidTarget["type"] = "mod-target-modio#0";
-							targets["android"] = androidTarget;
-						}
-						string infoString = "networker;" + mature + ";" + temp + ";" + fileSizeKB + ";" + fileName + ";" + structureVersion + ";" + modNameSafe + ";0";
-						JObject infoTarget = new JObject();
-						infoTarget["ref"] = "3";
-						infoTarget["type"] = "mod-target-modio#0";
-						targets[infoString] = infoTarget;
-						obj2["targets"] = targets;
-						objects["2"] = obj2;
-						JObject obj3 = new JObject();
-						obj3["gameId"] = 3809L;
-						obj3["modId"] = numericalIdLong;
-						obj3["modfileId"] = pcModfileId;
-						JObject isa3 = new JObject();
-						isa3["type"] = "mod-target-modio#0";
-						obj3["isa"] = isa3;
-						objects["3"] = obj3;
-						if (androidModfileId > 0L && androidModfileId != pcModfileId)
-						{
-							JObject obj4 = new JObject();
-							obj4["gameId"] = 3809L;
-							obj4["modId"] = numericalIdLong;
-							obj4["modfileId"] = androidModfileId;
-							JObject isa4 = new JObject();
-							isa4["type"] = "mod-target-modio#0";
-							obj4["isa"] = isa4;
-							objects["4"] = obj4;
-						}
-						manifest["objects"] = objects;
-						File.WriteAllText(expectedManifestPath, manifest.ToString(Formatting.Indented));
-						MelonLogger.Msg("BackfillManifests: Wrote manifest for " + barcode + " (" + modId + ")");
-						backfilled++;
+					string modNameSafe = modName.Replace(";", "");
+					string catalogPath = ModFileManager.FindFile(modDir, "catalog.json");
+					long pcModfileId = 0L;
+					long androidModfileId = 0L;
+					try { if (!string.IsNullOrEmpty(windowsLink) && windowsLink.Contains("/files/")) pcModfileId = long.Parse(windowsLink.Split("/files/")[1].Replace("/download", "")); } catch { }
+					try { if (!string.IsNullOrEmpty(androidLink) && androidLink.Contains("/files/")) androidModfileId = long.Parse(androidLink.Split("/files/")[1].Replace("/download", "")); } catch { }
+					long numericalIdLong = long.TryParse(numericalId, out long parsedId) ? parsedId : 0L;
+					JObject manifest = new JObject();
+					JObject objects = new JObject();
+					JObject obj1 = new JObject();
+					obj1["palletBarcode"] = barcode;
+					obj1["palletPath"] = palletPath;
+					obj1["catalogPath"] = !string.IsNullOrEmpty(catalogPath) ? catalogPath : "";
+					objects["1"] = obj1;
+					JObject obj2 = new JObject();
+					obj2["barcode"] = barcode;
+					obj2["version"] = version ?? "0.0.0";
+					obj2["title"] = modId ?? "";
+					obj2["description"] = modSummary ?? "";
+					obj2["thumbnailUrl"] = thumbnailLink ?? "";
+					obj2["author"] = "ModIoModNetworker";
+					JObject targets = new JObject();
+					JObject pcTarget = new JObject();
+					pcTarget["ref"] = "3";
+					pcTarget["type"] = "mod-target-modio#0";
+					targets["pc"] = pcTarget;
+					if (androidModfileId > 0L)
+					{
+						JObject androidTarget = new JObject();
+						androidTarget["ref"] = "4";
+						androidTarget["type"] = "mod-target-modio#0";
+						targets["android"] = androidTarget;
 					}
 					else
 					{
-						skipped++;
+						JObject androidTarget = new JObject();
+						androidTarget["ref"] = "3";
+						androidTarget["type"] = "mod-target-modio#0";
+						targets["android"] = androidTarget;
 					}
+					string infoString = "networker;" + mature + ";" + temp + ";" + fileSizeKB + ";" + fileName + ";" + structureVersion + ";" + modNameSafe + ";0";
+					JObject infoTarget = new JObject();
+					infoTarget["ref"] = "3";
+					infoTarget["type"] = "mod-target-modio#0";
+					targets[infoString] = infoTarget;
+					obj2["targets"] = targets;
+					objects["2"] = obj2;
+					JObject obj3 = new JObject();
+					obj3["gameId"] = 3809L;
+					obj3["modId"] = numericalIdLong;
+					obj3["modfileId"] = pcModfileId;
+					JObject isa3 = new JObject();
+					isa3["type"] = "mod-target-modio#0";
+					obj3["isa"] = isa3;
+					objects["3"] = obj3;
+					if (androidModfileId > 0L && androidModfileId != pcModfileId)
+					{
+						JObject obj4 = new JObject();
+						obj4["gameId"] = 3809L;
+						obj4["modId"] = numericalIdLong;
+						obj4["modfileId"] = androidModfileId;
+						JObject isa4 = new JObject();
+						isa4["type"] = "mod-target-modio#0";
+						obj4["isa"] = isa4;
+						objects["4"] = obj4;
+					}
+					manifest["objects"] = objects;
+					AtomicWriteFile(expectedManifestPath, manifest.ToString(Formatting.Indented));
+					MelonLogger.Msg("BackfillManifests: Wrote manifest for " + barcode + " (" + modId + ")");
+					backfilled++;
 				}
 			}
 			catch (Exception ex)
@@ -1541,4 +1518,15 @@ public class MainClass : MelonMod
 		}
 		return text.Replace("AuthToken=", "").Replace("REPLACE_THIS_TEXT_WITH_YOUR_TOKEN", "").Trim();
 	}
+	private static void AtomicWriteFile(string path, string content)
+	{
+		string tempPath = path + ".tmp";
+		File.WriteAllText(tempPath, content);
+		if (File.Exists(path))
+		{
+			File.Delete(path);
+		}
+		File.Move(tempPath, path);
+	}
+
 }
