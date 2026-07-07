@@ -5,7 +5,9 @@ using System.Threading;
 using BoneLib;
 using MelonLoader;
 using ModioModNetworker;
+using ModioModNetworker.Data;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 public class DownloadAction
 {
@@ -92,6 +94,7 @@ public class DownloadAction
 					string path = text6 + "/modinfo.json";
 					string contents = JsonConvert.SerializeObject((object)ModlistMenu.activeDownloadModInfo);
 					File.WriteAllText(path, contents);
+					WriteModListingManifest(ModlistMenu.activeDownloadModInfo, text6);
 					if (!flag)
 					{
 						MainClass.warehouseReloadFolders.Add(ModFileManager.FindFile(text6, "pallet.json"));
@@ -115,5 +118,115 @@ public class DownloadAction
 			}
 		});
 		thread.Start();
+	}
+
+	private void WriteModListingManifest(ModInfo modInfo, string modFolderPath)
+	{
+		try
+		{
+			string palletPath = ModFileManager.FindFile(modFolderPath, "pallet.json");
+			if (string.IsNullOrEmpty(palletPath))
+			{
+				MelonLogger.Error("WriteModListingManifest: Could not find pallet.json in " + modFolderPath);
+				return;
+			}
+			string palletJson = File.ReadAllText(palletPath);
+			dynamic palletData = JsonConvert.DeserializeObject<object>(palletJson);
+			string barcode = (string)palletData["objects"]["1"]["barcode"];
+			if (string.IsNullOrEmpty(barcode))
+			{
+				MelonLogger.Error("WriteModListingManifest: Could not find barcode in pallet.json");
+				return;
+			}
+			string catalogPath = ModFileManager.FindFile(modFolderPath, "catalog.json");
+			long pcModfileId = 0L;
+			long androidModfileId = 0L;
+			try
+			{
+				if (!string.IsNullOrEmpty(modInfo.windowsDownloadLink) && modInfo.windowsDownloadLink.Contains("/files/"))
+				{
+					pcModfileId = long.Parse(modInfo.windowsDownloadLink.Split("/files/")[1].Replace("/download", ""));
+				}
+			}
+			catch (Exception)
+			{
+			}
+			try
+			{
+				if (!string.IsNullOrEmpty(modInfo.androidDownloadLink) && modInfo.androidDownloadLink.Contains("/files/"))
+				{
+					androidModfileId = long.Parse(modInfo.androidDownloadLink.Split("/files/")[1].Replace("/download", ""));
+				}
+			}
+			catch (Exception)
+			{
+			}
+			long numericalId = long.Parse(modInfo.numericalId);
+			JObject manifest = new JObject();
+			JObject objects = new JObject();
+			JObject obj1 = new JObject();
+			obj1["palletBarcode"] = barcode;
+			obj1["palletPath"] = palletPath;
+			obj1["catalogPath"] = ((!string.IsNullOrEmpty(catalogPath)) ? catalogPath : "");
+			objects["1"] = obj1;
+			JObject obj2 = new JObject();
+			obj2["barcode"] = barcode;
+			obj2["version"] = (modInfo.version ?? "0.0.0");
+			obj2["title"] = modInfo.modId;
+			obj2["description"] = (modInfo.modSummary ?? "");
+			obj2["thumbnailUrl"] = (modInfo.thumbnailLink ?? "");
+			obj2["author"] = "ModIoModNetworker";
+			JObject targets = new JObject();
+			JObject pcTarget = new JObject();
+			pcTarget["ref"] = "3";
+			pcTarget["type"] = "mod-target-modio#0";
+			targets["pc"] = pcTarget;
+			int nextRef = 4;
+			if (androidModfileId > 0L)
+			{
+				JObject androidTarget = new JObject();
+				androidTarget["ref"] = nextRef.ToString();
+				androidTarget["type"] = "mod-target-modio#0";
+				targets["android"] = androidTarget;
+				nextRef++;
+			}
+			string infoString = modInfo.ToInfoString();
+			if (!string.IsNullOrEmpty(infoString))
+			{
+				JObject infoTarget = new JObject();
+				infoTarget["ref"] = "3";
+				infoTarget["type"] = "mod-target-modio#0";
+				targets[infoString] = infoTarget;
+			}
+			obj2["targets"] = targets;
+			objects["2"] = obj2;
+			JObject obj3 = new JObject();
+			obj3["gameId"] = 3809L;
+			obj3["modId"] = numericalId;
+			obj3["modfileId"] = pcModfileId;
+			JObject isa3 = new JObject();
+			isa3["type"] = "mod-target-modio#0";
+			obj3["isa"] = isa3;
+			objects["3"] = obj3;
+			if (androidModfileId > 0L)
+			{
+				JObject obj4 = new JObject();
+				obj4["gameId"] = 3809L;
+				obj4["modId"] = numericalId;
+				obj4["modfileId"] = androidModfileId;
+				JObject isa4 = new JObject();
+				isa4["type"] = "mod-target-modio#0";
+				obj4["isa"] = isa4;
+				objects["4"] = obj4;
+			}
+			manifest["objects"] = objects;
+			string manifestPath = Path.Combine(modFolderPath, barcode + ".manifest");
+			File.WriteAllText(manifestPath, manifest.ToString(Formatting.Indented));
+			MelonLogger.Msg("WriteModListingManifest: Wrote manifest for " + barcode);
+		}
+		catch (Exception ex)
+		{
+			MelonLogger.Error("WriteModListingManifest: Error writing manifest: " + ex.Message);
+		}
 	}
 }
