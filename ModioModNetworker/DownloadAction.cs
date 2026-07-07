@@ -168,11 +168,17 @@ public class DownloadAction
 			obj1["palletBarcode"] = barcode;
 			obj1["palletPath"] = palletPath;
 			obj1["catalogPath"] = ((!string.IsNullOrEmpty(catalogPath)) ? catalogPath : "");
+			obj1["version"] = "1.0.0";
+			obj1["installedDate"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
+			obj1["updateDate"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
+			obj1["active"] = true;
+			obj1["isa"] = new JObject();
+			((JObject)obj1["isa"])["type"] = "pallet-manifest#0";
 			objects["1"] = obj1;
 			JObject obj2 = new JObject();
 			obj2["barcode"] = barcode;
 			obj2["version"] = (modInfo.version ?? "0.0.0");
-			obj2["title"] = modInfo.modId;
+			obj2["title"] = (!string.IsNullOrEmpty(modInfo.modName) ? modInfo.modName : modInfo.modId) ?? "";
 			obj2["description"] = (modInfo.modSummary ?? "");
 			obj2["thumbnailUrl"] = (modInfo.thumbnailLink ?? "");
 			obj2["author"] = "ModIoModNetworker";
@@ -219,15 +225,33 @@ public class DownloadAction
 				obj4["isa"] = isa4;
 				objects["4"] = obj4;
 			}
+			manifest["version"] = 2;
+			manifest["root"] = new JObject();
+			manifest["root"]["ref"] = "1";
+			manifest["root"]["type"] = "pallet-manifest#0";
 			manifest["objects"] = objects;
+			string manifestContent = manifest.ToString(Formatting.Indented);
+			// Write subfolder manifest
 			string manifestPath = Path.Combine(modFolderPath, barcode + ".manifest");
 			string tempManifestPath = manifestPath + ".tmp";
-			File.WriteAllText(tempManifestPath, manifest.ToString(Formatting.Indented));
+			File.WriteAllText(tempManifestPath, manifestContent);
 			if (File.Exists(manifestPath))
 			{
 				File.Delete(manifestPath);
 			}
 			File.Move(tempManifestPath, manifestPath);
+			// Also overwrite top-level manifest
+			string topLevelManifestPath = Path.Combine(ModFileManager.MOD_FOLDER_PATH, barcode + ".manifest");
+			if (!string.IsNullOrEmpty(ModFileManager.MOD_FOLDER_PATH) && topLevelManifestPath != manifestPath)
+			{
+				string tempTopPath = topLevelManifestPath + ".tmp";
+				File.WriteAllText(tempTopPath, manifestContent);
+				if (File.Exists(topLevelManifestPath))
+				{
+					File.Delete(topLevelManifestPath);
+				}
+				File.Move(tempTopPath, topLevelManifestPath);
+			}
 			MelonLogger.Msg("WriteModListingManifest: Wrote manifest for " + barcode);
 		}
 		catch (Exception ex)

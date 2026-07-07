@@ -142,7 +142,6 @@ public class ModInfo
 			val.Version = version;
 			val.Targets = new StringModTargetListingDictionary();
 			ModIOModTarget val2 = new ModIOModTarget();
-			((ModTarget)val2).ThumbnailOverride = null;
 			val2.GameId = 3809L;
 			val2.ModId = long.Parse(numericalId);
 			try
@@ -157,7 +156,6 @@ public class ModInfo
 			}
 			val.Targets.Add("pc", (ModTarget)(object)val2);
 			ModIOModTarget val3 = new ModIOModTarget();
-			((ModTarget)val3).ThumbnailOverride = null;
 			val3.GameId = 3809L;
 			val3.ModId = long.Parse(numericalId);
 			try

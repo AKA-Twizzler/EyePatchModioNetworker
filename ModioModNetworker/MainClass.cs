@@ -167,6 +167,47 @@ public class MainClass : MelonMod
 		AssetBundle bundle = (HelperMethods.IsAndroid() ? HelperMethods.LoadEmbeddedAssetBundle(Assembly.GetExecutingAssembly(), "ModioModNetworker.Resources.networkermenu.android.networker") : HelperMethods.LoadEmbeddedAssetBundle(Assembly.GetExecutingAssembly(), "ModioModNetworker.Resources.networkermenu.networker"));
 		NetworkerAssets.LoadAssetsUI(bundle);
 		PrepareModFiles();
+		// Delete stale Networker manifest files to prevent AssetWarehouse crash during pallet loading
+		try
+		{
+			string modFolder = ModFileManager.MOD_FOLDER_PATH;
+			if (Directory.Exists(modFolder))
+			{
+				string[] modDirs = Directory.GetDirectories(modFolder);
+				foreach (string dir in modDirs)
+				{
+					string[] manifests = Directory.GetFiles(dir, "*.manifest");
+					foreach (string manifest in manifests)
+					{
+						File.Delete(manifest);
+					}
+				}
+				string[] rootManifests = Directory.GetFiles(modFolder, "*.manifest");
+				foreach (string manifest in rootManifests)
+				{
+					string name = Path.GetFileNameWithoutExtension(manifest);
+					if (!name.StartsWith("SLZ."))
+					{
+						File.Delete(manifest);
+					}
+				}
+				MelonLogger.Msg("Pre-init: Cleaned stale mod manifests (NRE prevention)");
+			}
+		}
+		catch (Exception ex)
+		{
+			MelonLogger.Error("Pre-init manifest cleanup failed: " + ex.Message);
+		}
+		// Immediately backfill manifests so AssetWarehouse finds them during init
+		try
+		{
+			BackfillManifests();
+			MelonLogger.Msg("OnInitializeMelon: Pre-initialization manifest backfill complete");
+		}
+		catch (Exception ex)
+		{
+			MelonLogger.Error("OnInitializeMelon: Pre-init BackfillManifests failed: " + ex.Message);
+		}
 		string text = ReadAuthKey();
 		if (!string.IsNullOrEmpty(text))
 		{
@@ -649,34 +690,7 @@ public class MainClass : MelonMod
 					matches = true;
 				}
 
-				// Strategy 2: Match by fileName (installed dl filename vs subscription filename)
-				if (!matches && !string.IsNullOrEmpty(installedMod.fileName) &&
-					!string.IsNullOrEmpty(subMod.fileName) &&
-					installedMod.fileName == subMod.fileName)
-				{
-					matches = true;
-				}
-
-				// Strategy 3: Match by modId (URL slug) — fallback
-				if (!matches && !string.IsNullOrEmpty(installedMod.modId) &&
-					!string.IsNullOrEmpty(subMod.modId) &&
-					installedMod.modId == subMod.modId)
-				{
-					matches = true;
-				}
-
-				// Strategy 4: Try to match installed mod's fileName (zip) against subscription patterns
-				if (!matches && !string.IsNullOrEmpty(installedMod.fileName))
-				{
-					string fileNameLower = installedMod.fileName.ToLowerInvariant();
-					string subModIdLower = subMod.modId.ToLowerInvariant();
-					if (fileNameLower.Contains(subModIdLower) || subModIdLower.Contains(fileNameLower))
-					{
-						matches = true;
-					}
-				}
-
-				// Strategy 5: Match by display title (installed modId is the title from manifest)
+				// Strategy 2: Match by display title (installed modId is the title from manifest)
 				if (!matches && !string.IsNullOrEmpty(installedMod.modId) && 
 				    !string.IsNullOrEmpty(subMod.modName))
 				{
@@ -684,6 +698,33 @@ public class MainClass : MelonMod
 					string installedTitle = installedMod.modId.ToLowerInvariant().Replace(" ", "").Replace("-", "").Replace("_", "");
 					string subName = subMod.modName.ToLowerInvariant().Replace(" ", "").Replace("-", "").Replace("_", "");
 					if (installedTitle.Contains(subName) || subName.Contains(installedTitle))
+					{
+						matches = true;
+					}
+				}
+
+				// Strategy 3: Match by fileName (installed dl filename vs subscription filename)
+				if (!matches && !string.IsNullOrEmpty(installedMod.fileName) &&
+					!string.IsNullOrEmpty(subMod.fileName) &&
+					installedMod.fileName == subMod.fileName)
+				{
+					matches = true;
+				}
+
+				// Strategy 4: Match by display name (installed modId is the manifest title)
+				if (!matches && !string.IsNullOrEmpty(installedMod.modId) &&
+					!string.IsNullOrEmpty(subMod.modName) &&
+					installedMod.modId == subMod.modName)
+				{
+					matches = true;
+				}
+
+				// Strategy 5: Try to match installed mod's fileName (zip) against subscription patterns
+				if (!matches && !string.IsNullOrEmpty(installedMod.fileName))
+				{
+					string fileNameLower = installedMod.fileName.ToLowerInvariant();
+					string subModIdLower = subMod.modId.ToLowerInvariant();
+					if (fileNameLower.Contains(subModIdLower) || subModIdLower.Contains(fileNameLower))
 					{
 						matches = true;
 					}
@@ -1221,92 +1262,107 @@ public class MainClass : MelonMod
 					}
 				}
 				// STEP 2: Always rewrite manifest unconditionally
-				if (needsUpdate)
+				string expectedManifestPath = Path.Combine(modDir, barcode + ".manifest");
+				string windowsLink = (string)modInfoObj["windowsDownloadLink"] ?? "";
+				string androidLink = (string)modInfoObj["androidDownloadLink"] ?? "";
+				string version = (string)modInfoObj["version"] ?? "0.0.0";
+				string modId = (string)modInfoObj["modId"] ?? "";
+				string modSummary = (string)modInfoObj["modSummary"] ?? "";
+				string thumbnailLink = (string)modInfoObj["thumbnailLink"] ?? "";
+				string mature = modInfoObj["mature"]?.ToString() ?? "False";
+				string temp = modInfoObj["temp"]?.ToString() ?? "False";
+				string fileSizeKB = modInfoObj["fileSizeKB"]?.ToString() ?? "0";
+				string fileName = modInfoObj["fileName"]?.ToString() ?? "";
+				string structureVersion = modInfoObj["structureVersion"]?.ToString() ?? "0";
+				string modName = modInfoObj["modName"]?.ToString() ?? "";
+				string modNameSafe = modName.Replace(";", "");
+				string catalogPath = ModFileManager.FindFile(modDir, "catalog.json");
+				long pcModfileId = 0L;
+				long androidModfileId = 0L;
+				try { if (!string.IsNullOrEmpty(windowsLink) && windowsLink.Contains("/files/")) pcModfileId = long.Parse(windowsLink.Split("/files/")[1].Replace("/download", "")); } catch { }
+				try { if (!string.IsNullOrEmpty(androidLink) && androidLink.Contains("/files/")) androidModfileId = long.Parse(androidLink.Split("/files/")[1].Replace("/download", "")); } catch { }
+				long numericalIdLong = long.TryParse(numericalId, out long parsedId) ? parsedId : 0L;
+				JObject manifest = new JObject();
+				JObject objects = new JObject();
+            JObject obj1 = new JObject();
+            obj1["palletBarcode"] = barcode;
+            obj1["palletPath"] = palletPath;
+            obj1["catalogPath"] = !string.IsNullOrEmpty(catalogPath) ? catalogPath : "";
+            obj1["version"] = "1.0.0";
+            obj1["installedDate"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
+            obj1["updateDate"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
+            obj1["active"] = true;
+            obj1["isa"] = new JObject();
+            ((JObject)obj1["isa"])["type"] = "pallet-manifest#0";
+            objects["1"] = obj1;
+				JObject obj2 = new JObject();
+				obj2["barcode"] = barcode;
+				obj2["version"] = version ?? "0.0.0";
+				obj2["title"] = (!string.IsNullOrEmpty(modName) ? modName : modId) ?? "";
+				obj2["description"] = modSummary ?? "";
+				obj2["thumbnailUrl"] = thumbnailLink ?? "";
+				obj2["author"] = "ModIoModNetworker";
+				JObject targets = new JObject();
+				JObject pcTarget = new JObject();
+				pcTarget["ref"] = "3";
+				pcTarget["type"] = "mod-target-modio#0";
+				targets["pc"] = pcTarget;
+				if (androidModfileId > 0L)
 				{
-					string expectedManifestPath = Path.Combine(modDir, barcode + ".manifest");
-					string windowsLink = (string)modInfoObj["windowsDownloadLink"] ?? "";
-					string androidLink = (string)modInfoObj["androidDownloadLink"] ?? "";
-					string version = (string)modInfoObj["version"] ?? "0.0.0";
-					string modId = (string)modInfoObj["modId"] ?? "";
-					string modSummary = (string)modInfoObj["modSummary"] ?? "";
-					string thumbnailLink = (string)modInfoObj["thumbnailLink"] ?? "";
-					string mature = modInfoObj["mature"]?.ToString() ?? "False";
-					string temp = modInfoObj["temp"]?.ToString() ?? "False";
-					string fileSizeKB = modInfoObj["fileSizeKB"]?.ToString() ?? "0";
-					string fileName = modInfoObj["fileName"]?.ToString() ?? "";
-					string structureVersion = modInfoObj["structureVersion"]?.ToString() ?? "0";
-					string modName = modInfoObj["modName"]?.ToString() ?? "";
-					string modNameSafe = modName.Replace(";", "");
-					string catalogPath = ModFileManager.FindFile(modDir, "catalog.json");
-					long pcModfileId = 0L;
-					long androidModfileId = 0L;
-					try { if (!string.IsNullOrEmpty(windowsLink) && windowsLink.Contains("/files/")) pcModfileId = long.Parse(windowsLink.Split("/files/")[1].Replace("/download", "")); } catch { }
-					try { if (!string.IsNullOrEmpty(androidLink) && androidLink.Contains("/files/")) androidModfileId = long.Parse(androidLink.Split("/files/")[1].Replace("/download", "")); } catch { }
-					long numericalIdLong = long.TryParse(numericalId, out long parsedId) ? parsedId : 0L;
-					JObject manifest = new JObject();
-					JObject objects = new JObject();
-					JObject obj1 = new JObject();
-					obj1["palletBarcode"] = barcode;
-					obj1["palletPath"] = palletPath;
-					obj1["catalogPath"] = !string.IsNullOrEmpty(catalogPath) ? catalogPath : "";
-					objects["1"] = obj1;
-					JObject obj2 = new JObject();
-					obj2["barcode"] = barcode;
-					obj2["version"] = version ?? "0.0.0";
-					obj2["title"] = modId ?? "";
-					obj2["description"] = modSummary ?? "";
-					obj2["thumbnailUrl"] = thumbnailLink ?? "";
-					obj2["author"] = "ModIoModNetworker";
-					JObject targets = new JObject();
-					JObject pcTarget = new JObject();
-					pcTarget["ref"] = "3";
-					pcTarget["type"] = "mod-target-modio#0";
-					targets["pc"] = pcTarget;
-					if (androidModfileId > 0L)
-					{
-						JObject androidTarget = new JObject();
-						androidTarget["ref"] = "4";
-						androidTarget["type"] = "mod-target-modio#0";
-						targets["android"] = androidTarget;
-					}
-					else
-					{
-						JObject androidTarget = new JObject();
-						androidTarget["ref"] = "3";
-						androidTarget["type"] = "mod-target-modio#0";
-						targets["android"] = androidTarget;
-					}
-					string infoString = "networker;" + mature + ";" + temp + ";" + fileSizeKB + ";" + fileName + ";" + structureVersion + ";" + modNameSafe + ";0";
-					JObject infoTarget = new JObject();
-					infoTarget["ref"] = "3";
-					infoTarget["type"] = "mod-target-modio#0";
-					targets[infoString] = infoTarget;
-					obj2["targets"] = targets;
-					objects["2"] = obj2;
-					JObject obj3 = new JObject();
-					obj3["gameId"] = 3809L;
-					obj3["modId"] = numericalIdLong;
-					obj3["modfileId"] = pcModfileId;
-					JObject isa3 = new JObject();
-					isa3["type"] = "mod-target-modio#0";
-					obj3["isa"] = isa3;
-					objects["3"] = obj3;
-					if (androidModfileId > 0L && androidModfileId != pcModfileId)
-					{
-						JObject obj4 = new JObject();
-						obj4["gameId"] = 3809L;
-						obj4["modId"] = numericalIdLong;
-						obj4["modfileId"] = androidModfileId;
-						JObject isa4 = new JObject();
-						isa4["type"] = "mod-target-modio#0";
-						obj4["isa"] = isa4;
-						objects["4"] = obj4;
-					}
-					manifest["objects"] = objects;
-					AtomicWriteFile(expectedManifestPath, manifest.ToString(Formatting.Indented));
-					MelonLogger.Msg("BackfillManifests: Wrote manifest for " + barcode + " (" + modId + ")");
-					backfilled++;
+					JObject androidTarget = new JObject();
+					androidTarget["ref"] = "4";
+					androidTarget["type"] = "mod-target-modio#0";
+					targets["android"] = androidTarget;
 				}
+				else
+				{
+					JObject androidTarget = new JObject();
+					androidTarget["ref"] = "3";
+					androidTarget["type"] = "mod-target-modio#0";
+					targets["android"] = androidTarget;
+				}
+				string infoString = "networker;" + mature + ";" + temp + ";" + fileSizeKB + ";" + fileName + ";" + structureVersion + ";" + modNameSafe + ";0";
+				JObject infoTarget = new JObject();
+				infoTarget["ref"] = "3";
+				infoTarget["type"] = "mod-target-modio#0";
+				targets[infoString] = infoTarget;
+				obj2["targets"] = targets;
+				objects["2"] = obj2;
+				JObject obj3 = new JObject();
+				obj3["gameId"] = 3809L;
+				obj3["modId"] = numericalIdLong;
+				obj3["modfileId"] = pcModfileId;
+				JObject isa3 = new JObject();
+				isa3["type"] = "mod-target-modio#0";
+				obj3["isa"] = isa3;
+				objects["3"] = obj3;
+				if (androidModfileId > 0L && androidModfileId != pcModfileId)
+				{
+					JObject obj4 = new JObject();
+					obj4["gameId"] = 3809L;
+					obj4["modId"] = numericalIdLong;
+					obj4["modfileId"] = androidModfileId;
+					JObject isa4 = new JObject();
+					isa4["type"] = "mod-target-modio#0";
+					obj4["isa"] = isa4;
+					objects["4"] = obj4;
+				}
+            manifest["version"] = 2;
+            manifest["root"] = new JObject();
+            manifest["root"]["ref"] = "1";
+            manifest["root"]["type"] = "pallet-manifest#0";
+            manifest["objects"] = objects;
+				string manifestContent = manifest.ToString(Formatting.Indented);
+				// Write subfolder manifest
+				AtomicWriteFile(expectedManifestPath, manifestContent);
+				// Also overwrite top-level manifest (was likely Format A/truncated)
+				string topLevelManifestPath = Path.Combine(ModFileManager.MOD_FOLDER_PATH, barcode + ".manifest");
+				if (topLevelManifestPath != expectedManifestPath)
+				{
+					AtomicWriteFile(topLevelManifestPath, manifestContent);
+				}
+				MelonLogger.Msg("BackfillManifests: Wrote manifest for " + barcode + " (" + modId + ")");
+				backfilled++;
 			}
 			catch (Exception ex)
 			{
@@ -1315,6 +1371,14 @@ public class MainClass : MelonMod
 			}
 		}
 		MelonLogger.Msg("BackfillManifests: Done. Backfilled: " + backfilled + ", Queued update: " + queuedUpdate + ", Skipped/OK: " + skipped);
+		// Trigger warehouse reload so fresh manifests are picked up
+		if (!string.IsNullOrEmpty(ModFileManager.MOD_FOLDER_PATH))
+		{
+			warehouseReloadRequested = true;
+			if (!warehouseReloadFolders.Contains(ModFileManager.MOD_FOLDER_PATH))
+				warehouseReloadFolders.Add(ModFileManager.MOD_FOLDER_PATH);
+			MelonLogger.Msg("BackfillManifests: Triggered warehouse reload for " + backfilled + " mods");
+		}
 	}
 
 	public void OnStartServer()

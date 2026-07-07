@@ -26,6 +26,7 @@ public class ThumbnailThreader
 	{
 		if (string.IsNullOrEmpty(url))
 		{
+			MelonLoader.MelonLogger.Warning("[Diag] DownloadThumbnail: url is null/empty - no thumbnail to download");
 			return;
 		}
 
@@ -80,7 +81,7 @@ public class ThumbnailThreader
 				{
 				}
 
-				// Fallback: try API endpoint with Accept header for image content
+				// Fallback: try API endpoint to get logo URL, then download
 				if (apiFallbackUrl != null)
 				{
 					using (var handler = new System.Net.Http.HttpClientHandler
@@ -97,21 +98,30 @@ public class ThumbnailThreader
 						apiClient.DefaultRequestHeaders.Add("X-Modio-Platform", "windows");
 						apiClient.DefaultRequestHeaders.Add("X-Modio-Portal", "steam");
 
-						// Try requesting the image directly with Accept header
-						var imageRequest = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, apiFallbackUrl);
-						imageRequest.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("image/png", 0.8));
-						imageRequest.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("image/jpeg", 0.8));
-						imageRequest.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("image/*", 0.5));
-						imageRequest.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("*/*", 0.1));
-
-						var response = await apiClient.SendAsync(imageRequest);
-						if (response.IsSuccessStatusCode)
+						// Request the logo metadata from API (returns JSON with logo URLs)
+						var jsonResponse = await apiClient.GetAsync(apiFallbackUrl);
+						if (jsonResponse.IsSuccessStatusCode)
 						{
-							byte[] imageBytes = await response.Content.ReadAsByteArrayAsync();
-							if (imageBytes.Length > 1000 && imageBytes[0] != 0x7b) // Not JSON (not starting with '{')
+							string jsonBody = await jsonResponse.Content.ReadAsStringAsync();
+							if (jsonBody.Length > 10 && jsonBody[0] == '{')
 							{
-								CreateTexture(imageBytes, action);
-								return;
+								var logoData = Newtonsoft.Json.Linq.JObject.Parse(jsonBody);
+								// Try thumb_640x360 first, then original, then any URL found
+								string logoUrl = logoData["thumb_640x360"]?.ToString();
+								if (string.IsNullOrEmpty(logoUrl))
+									logoUrl = logoData["original"]?.ToString();
+								if (string.IsNullOrEmpty(logoUrl))
+									logoUrl = logoData["url"]?.ToString();
+
+								if (!string.IsNullOrEmpty(logoUrl))
+								{
+									byte[] imageBytes = await apiClient.GetByteArrayAsync(logoUrl);
+									if (imageBytes.Length > 1000)
+									{
+										CreateTexture(imageBytes, action);
+										return;
+									}
+								}
 							}
 						}
 					}
