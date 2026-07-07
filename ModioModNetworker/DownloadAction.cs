@@ -161,7 +161,7 @@ public class DownloadAction
 			catch (Exception)
 			{
 			}
-			long numericalId = long.Parse(modInfo.numericalId);
+			long numericalId = long.TryParse(modInfo.numericalId, out long parsedNumId) ? parsedNumId : 0L;
 			JObject manifest = new JObject();
 			JObject objects = new JObject();
 			JObject obj1 = new JObject();

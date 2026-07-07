@@ -199,7 +199,11 @@ public class ModInfo
 	public void PopulateFromInfoString(string targetString)
 	{
 		string[] array = ToSafeString(targetString).Split(";");
-		if (array.Length < 8) return;
+		if (array.Length < 8)
+		{
+			MelonLoader.MelonLogger.Warning("PopulateFromInfoString: Info string has only " + array.Length + " fields (expected 8+) from '" + targetString + "'");
+			return;
+		}
 
 		mature = bool.Parse(array[1]);
 		temp = bool.Parse(array[2]);
