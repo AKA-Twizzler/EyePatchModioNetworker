@@ -1035,10 +1035,12 @@ public class MainClass : MelonMod
 			{
 				continue;
 			}
-			dynamic val = JsonConvert.DeserializeObject<object>(File.ReadAllText(text));
+			dynamic val = null;
 			ModInfo modInfo = new ModInfo();
 			try
 			{
+				val = JsonConvert.DeserializeObject<object>(File.ReadAllText(text));
+				if (val == null) throw new Exception("Failed to parse manifest JSON");
 				string version = (string)val["objects"]["2"]["version"];
 				string modId = (string)val["objects"]["2"]["title"];
 				string modSummary = (string)val["objects"]["2"]["description"];
@@ -1061,7 +1063,8 @@ public class MainClass : MelonMod
 						if (text3.Contains("networker"))
 						{
 							string[] array = text3.Split("\": {");
-							text2 = array[0].Replace("\"", "");
+							if (array.Length > 0)
+								text2 = array[0].Replace("\"", "");
 						}
 					}
 				}
@@ -1321,7 +1324,7 @@ public class MainClass : MelonMod
 					androidTarget["type"] = "mod-target-modio#0";
 					targets["android"] = androidTarget;
 				}
-				string infoString = "networker;" + mature + ";" + temp + ";" + fileSizeKB + ";" + fileName + ";" + structureVersion + ";" + modNameSafe + ";0";
+				string infoString = "networker;" + mature + ";" + temp + ";" + fileSizeKB + ";" + fileName + ";" + structureVersion + ";" + modNameSafe + ";" + (modInfoObj["tags"] is JArray tagsArray ? tagsArray.Count.ToString() : "0");
 				JObject infoTarget = new JObject();
 				infoTarget["ref"] = "3";
 				infoTarget["type"] = "mod-target-modio#0";
