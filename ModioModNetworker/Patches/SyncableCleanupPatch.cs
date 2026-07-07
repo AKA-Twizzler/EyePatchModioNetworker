@@ -12,6 +12,7 @@ public class SyncableCleanupPatch
 		public static void Prefix()
 		{
 			SpawnableHoldQueue.ClearQueue();
+			SpawnableHoldQueue.ClearSpawnResponseDatas();
 		}
 	}
 }

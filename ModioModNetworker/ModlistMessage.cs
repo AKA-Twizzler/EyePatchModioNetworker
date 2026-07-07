@@ -147,6 +147,7 @@ public class ModlistMessage : ModuleMessageHandler
 			{
 				NetworkerMenuController.SetHostSubscribedMods(modlist);
 				modlist.Clear();
+				MainClass.confirmedHostHasIt = true;
 			}
 		}
 	}

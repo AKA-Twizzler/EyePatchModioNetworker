@@ -75,10 +75,7 @@ public class LevelHoldQueue
 			SpawnableHoldQueue.HandleAllSpawnResponseDatas();
 			finishedLoadingLevel = false;
 		}
-		if (SceneStreamer._session != null && !LevelInQueue() && (int)SceneStreamer._session.Status == 2)
-		{
-			SpawnableHoldQueue.ClearSpawnResponseDatas();
-		}
+		// Intentionally not clearing — cleanup is SyncableCleanupPatch's responsibility.
 	}
 
 	private static void Handle(LevelLoadData data)

@@ -189,10 +189,12 @@ public class MainClass : MelonMod
 				palletLock = false;
 				LevelHoldQueue.CheckValid(s._id);
 				SpawnableHoldQueue.CheckValid(s._id);
-				foreach (NetworkPlayer allNetworkPlayer in NetworkPlayerUtilities.GetAllNetworkPlayers())
+				// Only force avatar refresh for local player
+				if (NetworkPlayerManager.TryGetPlayer((byte)PlayerIDManager.LocalID, out var localPlayer))
 				{
-					FieldInfo field = ((object)allNetworkPlayer.AvatarSetter).GetType().GetField("_isAvatarDirty", BindingFlags.Instance | BindingFlags.NonPublic);
-					field.SetValue(allNetworkPlayer.AvatarSetter, true);
+					var field = localPlayer.AvatarSetter.GetType().GetField("_isAvatarDirty", BindingFlags.Instance | BindingFlags.NonPublic);
+					if (field != null)
+						field.SetValue(localPlayer.AvatarSetter, true);
 				}
 			});
 
