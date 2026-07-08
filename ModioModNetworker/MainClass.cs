@@ -352,8 +352,11 @@ public class MainClass : MelonMod
 		if (ModFileManager.activeDownloadQueueElement != null && ModFileManager.activeDownloadQueueElement.associatedPlayer != null && AvatarDownloadBar.bars.TryGetValue(ModFileManager.activeDownloadQueueElement.associatedPlayer, out AvatarDownloadBar value))
 		{
 			ModInfo activeDownloadModInfo = ModlistMenu.activeDownloadModInfo;
-			value.SetModName(activeDownloadModInfo.modId);
-			value.SetPercentage((float)activeDownloadModInfo.modDownloadPercentage);
+			if (activeDownloadModInfo != null)
+			{
+				value.SetModName(activeDownloadModInfo.modId);
+				value.SetPercentage((float)activeDownloadModInfo.modDownloadPercentage);
+			}
 		}
 		bool flag = false;
 		if (SceneStreamer._session != null && (int)SceneStreamer._session.Status == 1)
@@ -409,7 +412,10 @@ public class MainClass : MelonMod
 			}
 			else
 			{
-				AssetWarehouse.Instance.LoadAndUpdatePalletManifest(val.Pallet, ModlistMenu.activeDownloadModInfo.ToModListing(), val.PalletPath, val.CatalogPath, (IResourceLocator)null);
+				if (ModlistMenu.activeDownloadModInfo != null)
+				{
+					AssetWarehouse.Instance.LoadAndUpdatePalletManifest(val.Pallet, ModlistMenu.activeDownloadModInfo.ToModListing(), val.PalletPath, val.CatalogPath, (IResourceLocator)null);
+				}
 				warehousePalletReloadTargets.RemoveAt(0);
 				flag2 = true;
 			}
