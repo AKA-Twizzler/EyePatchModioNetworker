@@ -1327,7 +1327,7 @@ public class MainClass : MelonMod
 				JObject obj2 = new JObject();
 				obj2["barcode"] = barcode;
 				obj2["version"] = version ?? "0.0.0";
-				obj2["title"] = (!string.IsNullOrEmpty(modName) ? modName : modId) ?? "";
+				obj2["title"] = modId ?? "";
 				obj2["description"] = modSummary ?? "";
 				obj2["thumbnailUrl"] = thumbnailLink ?? "";
 				obj2["author"] = "ModIoModNetworker";

@@ -178,7 +178,7 @@ public class DownloadAction
 			JObject obj2 = new JObject();
 			obj2["barcode"] = barcode;
 			obj2["version"] = (modInfo.version ?? "0.0.0");
-			obj2["title"] = (!string.IsNullOrEmpty(modInfo.modName) ? modInfo.modName : modInfo.modId) ?? "";
+			obj2["title"] = modInfo.modId ?? "";
 			obj2["description"] = (modInfo.modSummary ?? "");
 			obj2["thumbnailUrl"] = (modInfo.thumbnailLink ?? "");
 			obj2["author"] = "ModIoModNetworker";
