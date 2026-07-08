@@ -532,6 +532,7 @@ public class MainClass : MelonMod
 			subsShown = 0;
 			desiredSubs = 0;
 			ModFileManager.QueueSubscriptions(subsShown);
+			ModFileManager.QueueTrending(0);
 		}
 		if (refreshInstalledModsRequested && !handlingSubscribed && !handlingInstalled)
 		{
@@ -1086,6 +1087,7 @@ public class MainClass : MelonMod
             catch (Exception ex)
             {
                 MelonLogger.Error($"Failed to parse subscription mod: {ex.Message}");
+                desiredSubs--;
                 continue;
             }
         }

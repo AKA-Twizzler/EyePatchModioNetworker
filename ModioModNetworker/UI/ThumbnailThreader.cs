@@ -47,34 +47,56 @@ public class ThumbnailThreader
 		{
 			try
 			{
-				// Attempt CDN download first — force IPv4 to avoid IPv6 routing issues
+				// Attempt CDN download with URL fallback chain using UnityWebRequest (IL2CPP-safe)
 				try
 				{
-					var handler = new System.Net.Http.SocketsHttpHandler
+					// Extract path for fallback URL construction
+					string path = null;
+					try
 					{
-						ConnectCallback = async (context, cancellationToken) =>
-						{
-							var hostEntry = await System.Net.Dns.GetHostEntryAsync(context.DnsEndPoint.Host, cancellationToken);
-							var ipv4 = hostEntry.AddressList.FirstOrDefault(ip => ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork) ?? hostEntry.AddressList.First();
-							var socket = new System.Net.Sockets.Socket(ipv4.AddressFamily, System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp)
-							{
-								NoDelay = true
-							};
-							await socket.ConnectAsync(new System.Net.IPEndPoint(ipv4, context.DnsEndPoint.Port), cancellationToken);
-							return new System.Net.Sockets.NetworkStream(socket, ownsSocket: true);
-						},
-						ConnectTimeout = TimeSpan.FromSeconds(15)
-					};
+						path = new Uri(url).AbsolutePath;
+					}
+					catch
+					{
+						MelonLoader.MelonLogger.Error("[Diag] DownloadThumbnail: Failed to parse CDN URL as URI");
+					}
 
-					using (var cdnClient = new System.Net.Http.HttpClient(handler)
+					// Build URL fallback chain: original → HTTP CDN → HTTPS alt CDN → HTTP alt CDN
+					List<string> urlsToTry = new List<string> { url };
+					if (path != null)
 					{
-						Timeout = TimeSpan.FromSeconds(15)
-					})
+						urlsToTry.Add($"http://thumb.modcdn.io{path}");
+						urlsToTry.Add($"https://thumb.modapi.io{path}");
+						urlsToTry.Add($"http://thumb.modapi.io{path}");
+					}
+
+					foreach (string tryUrl in urlsToTry)
 					{
-						cdnClient.DefaultRequestHeaders.UserAgent.ParseAdd("ModioModNetworker/2.8.17");
-						byte[] imageBytes = await cdnClient.GetByteArrayAsync(url);
-						CreateTexture(imageBytes, action);
-						return;
+						try
+						{
+							var uwr = UnityWebRequestTexture.GetTexture(tryUrl);
+							uwr.timeout = 15;
+							var op = uwr.SendWebRequest();
+							while (!op.isDone)
+							{
+								await Task.Delay(50);
+							}
+
+							if (uwr.result == UnityWebRequest.Result.Success)
+							{
+								Texture2D texture = DownloadHandlerTexture.GetContent(uwr);
+								MainThreadManager.QueueAction(() => action(texture));
+								return;
+							}
+							else
+							{
+								MelonLoader.MelonLogger.Error($"[Diag] DownloadThumbnail: CDN {tryUrl} failed: {uwr.result} - {uwr.error}");
+							}
+						}
+						catch (Exception ex)
+						{
+							MelonLoader.MelonLogger.Error($"[Diag] DownloadThumbnail: CDN {tryUrl} exception: {ex.Message}");
+						}
 					}
 				}
 				catch (Exception ex)
