@@ -268,6 +268,7 @@ public class MainClass : MelonMod
 			MelonLogger.Msg("Populating currently installed mods via this mod.");
 			installedMods.Clear();
 			InstalledModInfos.Clear();
+			NetworkerMenuController.totalInstalled.Clear();
 			PopulateInstalledMods(ModFileManager.MOD_FOLDER_PATH);
 			BackfillManifests();
 			loadedInstalled = true;
@@ -400,9 +401,18 @@ public class MainClass : MelonMod
 						break;
 					}
 				}
+				if (val == null)
+			{
+				MelonLogger.Error("OnUpdate: Pallet manifest not found for " + warehousePalletReloadTargets[0] + ", skipping reload");
+				warehousePalletReloadTargets.RemoveAt(0);
+				flag2 = true;
+			}
+			else
+			{
 				AssetWarehouse.Instance.LoadAndUpdatePalletManifest(val.Pallet, ModlistMenu.activeDownloadModInfo.ToModListing(), val.PalletPath, val.CatalogPath, (IResourceLocator)null);
 				warehousePalletReloadTargets.RemoveAt(0);
 				flag2 = true;
+			}
 			}
 			if (warehouseReloadFolders.Count > 0)
 			{
@@ -420,7 +430,7 @@ public class MainClass : MelonMod
 					text = "Updated!";
 					text2 = "This mod has been updated and reloaded.";
 				}
-				if (ModFileManager.activeDownloadQueueElement.notify)
+				if (ModFileManager.activeDownloadQueueElement.notify && ModlistMenu.activeDownloadModInfo != null)
 				{
 					Notifier.Send(new Notification
 					{
