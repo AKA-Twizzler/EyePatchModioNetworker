@@ -109,6 +109,8 @@ public class NetworkerMenuController : MonoBehaviour
 
 	public static SpotlightOverride spotlightOverride = new SpotlightOverride();
 
+	private List<ModInfo> cachedSubscribedList = null;
+
 	private void Awake()
 	{
 		instance = this;
@@ -211,7 +213,22 @@ public class NetworkerMenuController : MonoBehaviour
 	{
 		if (selectedPanel == Panels.FILES)
 		{
-			SetFilterMode(chosenSort);
+			if (chosenSort == InstalledSort.SUBSCRIBED && cachedSubscribedList != null)
+			{
+				maxPages = (int)Math.Ceiling((double)cachedSubscribedList.Count / (double)maxDisplayPerPage);
+				if (pageNumber > maxPages) pageNumber = maxPages - 1;
+				PopulateFiles(pageNumber, cachedSubscribedList);
+			}
+			else if (chosenSort == InstalledSort.INSTALLED)
+			{
+				maxPages = (int)Math.Ceiling((double)totalInstalled.Count / (double)maxDisplayPerPage);
+				if (pageNumber > maxPages) pageNumber = maxPages - 1;
+				PopulateFiles(pageNumber);
+			}
+			else
+			{
+				SetFilterMode(chosenSort);
+			}
 		}
 	}
 
@@ -494,6 +511,7 @@ public class NetworkerMenuController : MonoBehaviour
 			((Component)filesTab.transform.Find("UninstallUnsubscribedModsButton")).gameObject.SetActive(true);
 			maxPages = (int)Math.Ceiling((double)totalInstalled.Count / (double)maxDisplayPerPage);
 			UpdateArrowDisplays();
+			cachedSubscribedList = null;
 			PopulateFiles(pageNumber);
 			break;
 		case InstalledSort.SUBSCRIBED:
@@ -509,6 +527,7 @@ public class NetworkerMenuController : MonoBehaviour
 					list.Add(item);
 				}
 			}
+			cachedSubscribedList = list;
 			maxPages = (int)Math.Ceiling((double)list.Count / (double)maxDisplayPerPage);
 			UpdateArrowDisplays();
 			PopulateFiles(pageNumber, list);
@@ -931,11 +950,19 @@ public class NetworkerMenuController : MonoBehaviour
 		}
 		if (selectedPanel == Panels.FILES)
 		{
-			if (chosenSort != InstalledSort.BLACKLIST)
+			if (chosenSort == InstalledSort.SUBSCRIBED && cachedSubscribedList != null)
 			{
-				SetFilterMode(chosenSort);
+				maxPages = (int)Math.Ceiling((double)cachedSubscribedList.Count / (double)maxDisplayPerPage);
+				if (pageNumber > maxPages) pageNumber = maxPages - 1;
+				PopulateFiles(pageNumber, cachedSubscribedList);
 			}
-			else
+			else if (chosenSort == InstalledSort.INSTALLED)
+			{
+				maxPages = (int)Math.Ceiling((double)totalInstalled.Count / (double)maxDisplayPerPage);
+				if (pageNumber > maxPages) pageNumber = maxPages - 1;
+				PopulateFiles(pageNumber);
+			}
+			else if (chosenSort == InstalledSort.BLACKLIST)
 			{
 				PopulateBlacklist(pageNumber);
 			}
