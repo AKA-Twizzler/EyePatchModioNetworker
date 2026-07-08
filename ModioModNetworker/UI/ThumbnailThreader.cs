@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using Il2CppInterop.Runtime.InteropTypes;
 using UnityEngine;
-using UnityEngine.Networking;
+// using UnityEngine.Networking; // removed - replaced with HttpClient for background thread safety
 using System.Threading.Tasks;
 using System.Linq;
 using ModioModNetworker;
@@ -47,7 +47,7 @@ public class ThumbnailThreader
 		{
 			try
 			{
-				// Attempt CDN download with URL fallback chain using UnityWebRequest (IL2CPP-safe)
+				// CDN download with pure .NET HttpClient (thread-safe on background threads)
 				try
 				{
 					// Extract path for fallback URL construction
@@ -70,38 +70,31 @@ public class ThumbnailThreader
 						urlsToTry.Add($"http://thumb.modapi.io{path}");
 					}
 
-					foreach (string tryUrl in urlsToTry)
+					using (var cdnClient = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(15) })
 					{
-						try
-						{
-							var uwr = UnityWebRequestTexture.GetTexture(tryUrl);
-							uwr.timeout = 15;
-							var op = uwr.SendWebRequest();
-							while (!op.isDone)
-							{
-								await Task.Delay(50);
-							}
+						cdnClient.DefaultRequestHeaders.UserAgent.ParseAdd("ModioModNetworker/2.8.49");
 
-							if (uwr.result == UnityWebRequest.Result.Success)
-							{
-								Texture2D texture = DownloadHandlerTexture.GetContent(uwr);
-								MainThreadManager.QueueAction(() => action(texture));
-								return;
-							}
-							else
-							{
-								MelonLoader.MelonLogger.Error($"[Diag] DownloadThumbnail: CDN {tryUrl} failed: {uwr.result} - {uwr.error}");
-							}
-						}
-						catch (Exception ex)
+						foreach (string tryUrl in urlsToTry)
 						{
-							MelonLoader.MelonLogger.Error($"[Diag] DownloadThumbnail: CDN {tryUrl} exception: {ex.Message}");
+							try
+							{
+								byte[] imageBytes = await cdnClient.GetByteArrayAsync(tryUrl);
+								if (imageBytes != null && imageBytes.Length > 100)
+								{
+									CreateTexture(imageBytes, action);
+									return;
+								}
+							}
+							catch (Exception ex)
+							{
+								MelonLoader.MelonLogger.Error($"[Diag] CDN {tryUrl} failed: {ex.Message}");
+							}
 						}
 					}
 				}
 				catch (Exception ex)
 				{
-					MelonLoader.MelonLogger.Error($"[Diag] DownloadThumbnail: CDN download failed: {ex.Message}");
+					MelonLoader.MelonLogger.Error($"[Diag] CDN download failed: {ex.Message}");
 				}
 
 				// Fallback: try API endpoint to get logo URL, then download

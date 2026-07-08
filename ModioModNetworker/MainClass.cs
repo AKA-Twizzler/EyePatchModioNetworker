@@ -590,25 +590,18 @@ public class MainClass : MelonMod
 				NetworkerMenuController.instance.UpdateModPopupButtons();
 			}
 		}
-		if (subscriptionThreadString != "" && !_processingSubscriptionData)
-		{
-			_processingSubscriptionData = true;
-			try
-			{
-				InternalPopulateSubscriptions();
-			}
-			finally
-			{
-				_processingSubscriptionData = false;
-			}
-		}
+		// Process trending FIRST
 		if (trendingThreadString != "")
 		{
 			InternalPopulateTrending();
-			if ((UnityEngine.Object)(object)NetworkerMenuController.instance != null)
-			{
-				NetworkerMenuController.instance.OnNewTrendingRecieved();
-			}
+			NetworkerMenuController.instance.OnNewTrendingRecieved();
+		}
+		// Process subscriptions SECOND
+		if (subscriptionThreadString != "" && !_processingSubscriptionData)
+		{
+			_processingSubscriptionData = true;
+			try { InternalPopulateSubscriptions(); }
+			finally { _processingSubscriptionData = false; }
 		}
 	}
 
@@ -988,6 +981,8 @@ public class MainClass : MelonMod
 		if (num3 == 0)
 		{
 			MelonLogger.Msg("No subscriptions found!");
+			subsRefreshing = true;      // ADD — signals notification condition
+			handlingSubscribed = false; // ADD — prevents stuck state
 			return;
 		}
 		if (val["data"] != null)

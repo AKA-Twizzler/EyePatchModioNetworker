@@ -206,31 +206,6 @@ public class NetworkerMenuController : MonoBehaviour
 		componentInChildren6.onClick.AddListener(new System.Action(() => OnInstallButtonPressed(selected: true)));
 		componentInChildren7.onClick.AddListener(new System.Action(() => OnBlacklistButtonPressed(selected: false)));
 		componentInChildren8.onClick.AddListener(new System.Action(() => OnBlacklistButtonPressed(selected: true)));
-		ApplyButtonColors(component);
-		ApplyButtonColors(component2);
-		ApplyButtonColors(component3);
-		ApplyButtonColors(component4);
-		ApplyButtonColors(component5);
-		ApplyButtonColors(component6);
-		ApplyButtonColors(component7);
-		ApplyButtonColors(component8);
-		ApplyButtonColors(component9);
-		ApplyButtonColors(upArrowButton);
-		ApplyButtonColors(downArrowButton);
-		ApplyButtonColors(modIoTabButton);
-		ApplyButtonColors(filesTabButton);
-		ApplyButtonColors(settingsTabButton);
-		ApplyButtonColors(multiplayerTabButton);
-		ApplyButtonColors(componentInChildren);
-		ApplyButtonColors(componentInChildren2);
-		ApplyButtonColors(componentInChildren3);
-		ApplyButtonColors(componentInChildren4);
-		ApplyButtonColors(componentInChildren5);
-		ApplyButtonColors(componentInChildren6);
-		ApplyButtonColors(componentInChildren7);
-		ApplyButtonColors(componentInChildren8);
-		ApplyButtonColors(componentInChildren9);
-		ApplyButtonColors(componentInChildren10);
 		ChangePanel(Panels.FILES);
 	}
 
@@ -1165,19 +1140,5 @@ public class NetworkerMenuController : MonoBehaviour
 	public void SetSelectorDesired(Transform transform)
 	{
 		desired = transform;
-	}
-
-	private static void ApplyButtonColors(Button button)
-	{
-		if (button == null) return;
-		button.transition = Selectable.Transition.ColorTint;
-		ColorBlock colors = button.colors;
-		colors.normalColor = Color.white;
-		colors.highlightedColor = new Color(0.75f, 0.75f, 0.75f, 1f);
-		colors.pressedColor = new Color(0.6f, 0.6f, 0.6f, 1f);
-		colors.selectedColor = Color.white;
-		colors.disabledColor = new Color(0.5f, 0.5f, 0.5f, 0.5f);
-		colors.fadeDuration = 0.1f;
-		button.colors = colors;
 	}
 }
