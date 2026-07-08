@@ -115,7 +115,7 @@ public class ModInfo
 
 	public bool IsSubscribed()
 	{
-		return isSubscribed;
+		return isSubscribed || (numericalId != null && MainClass.subscribedModIoNumericalIds.Contains(numericalId));
 	}
 
 	public bool IsInstalled()

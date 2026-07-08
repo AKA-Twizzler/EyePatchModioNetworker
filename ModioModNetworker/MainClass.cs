@@ -1117,6 +1117,8 @@ public class MainClass : MelonMod
 		catch (Exception e)
 		{
 			MelonLogger.Error("Failed to process subscriptions: " + e);
+			subsRefreshing = false;
+			handlingSubscribed = false;
 		}
 	}
 
