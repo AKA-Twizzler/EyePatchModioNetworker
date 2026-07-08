@@ -17,6 +17,8 @@ public class ModInfo
 {
 	public bool isValidMod;
 
+	public bool isSubscribed = false;
+
 	public bool downloading;
 
 	public bool mature;
@@ -113,7 +115,7 @@ public class ModInfo
 
 	public bool IsSubscribed()
 	{
-		return MainClass.subscribedModIoNumericalIds.Contains(numericalId);
+		return isSubscribed;
 	}
 
 	public bool IsInstalled()

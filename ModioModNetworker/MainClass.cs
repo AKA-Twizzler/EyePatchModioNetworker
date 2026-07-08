@@ -822,6 +822,7 @@ public class MainClass : MelonMod
 						installedMod.fileSizeKB = subMod.fileSizeKB;
 						updated = true;
 					}
+					installedMod.isSubscribed = true;
 					if (updated) count++;
 					break;
 				}
@@ -1079,6 +1080,11 @@ public class MainClass : MelonMod
 		catch (Exception e)
 		{
 			MelonLogger.Error("Failed to process subscriptions: " + e);
+		}
+		// Reset subscription flags with fresh data - mods no longer subscribed get cleared
+		foreach (ModInfo resetMod in NetworkerMenuController.totalInstalled)
+		{
+			resetMod.isSubscribed = false;
 		}
 		// Now that subscriptions are loaded, cross-reference with installed mods
 		CrossReferenceInstalledMods();
