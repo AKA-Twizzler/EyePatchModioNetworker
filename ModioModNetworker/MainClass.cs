@@ -618,24 +618,51 @@ public class MainClass : MelonMod
 
 	public static void ReceiveSubModInfo(ModInfo modInfo, bool ignoreTag = false)
 	{
-		InstalledModInfo installedModInfo = null;
 		if (modInfo.version == null)
 		{
 			modInfo.version = "0.0.0";
-		}
-		if (installedModInfo != null)
-		{
-			outOfDateModInfos.Remove(installedModInfo);
 		}
 		if (!modInfo.isValidMod)
 		{
 			toRemoveSubscribedModIoIds.Add(modInfo.numericalId);
 		}
-		ModFileManager.AddToQueue(new DownloadQueueElement
+
+		// Check if already installed - skip download if up to date
+		bool needsDownload = true;
+		if (!string.IsNullOrEmpty(modInfo.numericalId) && modInfo.numericalId != "0")
 		{
-			associatedPlayer = null,
-			info = modInfo
-		}, ignoreTag);
+			foreach (ModInfo installed in installedMods)
+			{
+				if (installed.numericalId == modInfo.numericalId)
+				{
+					// Found installed mod with same numericalId
+					string installedVer = installed.version ?? "0.0.0";
+					string subVer = modInfo.version ?? "0.0.0";
+					if (installedVer == subVer)
+					{
+						// Versions match - already up to date, skip download
+						needsDownload = false;
+					}
+					else
+					{
+						// Version mismatch - needs update
+						MelonLogger.Msg("ReceiveSubModInfo: Version mismatch for " + modInfo.modId
+							+ " (local: " + installedVer + ", remote: " + subVer + ") - queuing update");
+					}
+					break;
+				}
+			}
+		}
+
+		if (needsDownload)
+		{
+			ModFileManager.AddToQueue(new DownloadQueueElement
+			{
+				associatedPlayer = null,
+				info = modInfo
+			}, ignoreTag);
+		}
+
 		subscribedModIoNumericalIds.Add(modInfo.numericalId);
 		subscribedMods.Add(modInfo);
 	}
