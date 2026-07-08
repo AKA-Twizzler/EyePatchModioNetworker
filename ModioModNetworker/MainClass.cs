@@ -77,6 +77,8 @@ public class MainClass : MelonMod
 
 	public static bool subsRefreshing = false;
 
+	private static bool _processingSubscriptionData = false;
+
 	private static int desiredSubs = 0;
 
 	private bool addedCallback = false;
@@ -340,13 +342,21 @@ public class MainClass : MelonMod
 
 	public override void OnUpdate()
 	{
+		if (diagUpdateCount < 5) { MelonLogger.Msg("DIAG: OnUpdate tick " + (diagUpdateCount + 1)); }
+		diagUpdateCount++;
+		
+		// Snapshot to avoid collection modification exceptions
 		try
 		{
-			if (diagUpdateCount < 5) { MelonLogger.Msg("DIAG: OnUpdate tick " + (diagUpdateCount + 1)); }
-		diagUpdateCount++;
-		foreach (AvatarDownloadBar value3 in AvatarDownloadBar.bars.Values)
+			List<AvatarDownloadBar> barsSnapshot = new List<AvatarDownloadBar>(AvatarDownloadBar.bars.Values);
+			foreach (AvatarDownloadBar value3 in barsSnapshot)
+			{
+				value3.Update();
+			}
+		}
+		catch (Exception ex)
 		{
-			value3.Update();
+			MelonLogger.Error("OnUpdate: AvatarDownloadBar error: " + ex.Message);
 		}
 		ThumbnailThreader.HandleQueue();
 		MainThreadManager.HandleQueue();
@@ -558,9 +568,11 @@ public class MainClass : MelonMod
 				NetworkerMenuController.instance.UpdateModPopupButtons();
 			}
 		}
-		if (subscriptionThreadString != "")
+		if (subscriptionThreadString != "" && !_processingSubscriptionData)
 		{
+			_processingSubscriptionData = true;
 			InternalPopulateSubscriptions();
+			_processingSubscriptionData = false;
 		}
 		if (trendingThreadString != "")
 		{
@@ -569,11 +581,6 @@ public class MainClass : MelonMod
 			{
 				NetworkerMenuController.instance.OnNewTrendingRecieved();
 			}
-		}
-		}
-		catch (Exception ex)
-		{
-			MelonLogger.Error("OnUpdate: Unhandled exception: " + ex.Message);
 		}
 	}
 
@@ -851,7 +858,8 @@ public class MainClass : MelonMod
 
 	public static void PopulateSubscriptions()
 	{
-		refreshSubscribedModsRequested = true;
+		if (!_processingSubscriptionData)
+			refreshSubscribedModsRequested = true;
 	}
 
 	private static void InternalPopulateTrending()
