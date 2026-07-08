@@ -173,15 +173,6 @@ public class MainClass : MelonMod
 			string modFolder = ModFileManager.MOD_FOLDER_PATH;
 			if (Directory.Exists(modFolder))
 			{
-				string[] modDirs = Directory.GetDirectories(modFolder);
-				foreach (string dir in modDirs)
-				{
-					string[] manifests = Directory.GetFiles(dir, "*.manifest");
-					foreach (string manifest in manifests)
-					{
-						File.Delete(manifest);
-					}
-				}
 				string[] rootManifests = Directory.GetFiles(modFolder, "*.manifest");
 				foreach (string manifest in rootManifests)
 				{
@@ -403,7 +394,8 @@ public class MainClass : MelonMod
 			}
 			if (warehouseReloadFolders.Count > 0)
 			{
-				AssetWarehouse.Instance.LoadPalletFromFolderAsync(warehouseReloadFolders[0], true, (string)null, ModlistMenu.activeDownloadModInfo.ToModListing());
+				if (ModlistMenu.activeDownloadModInfo != null)
+					AssetWarehouse.Instance.LoadPalletFromFolderAsync(warehouseReloadFolders[0], true, (string)null, ModlistMenu.activeDownloadModInfo.ToModListing());
 				warehouseReloadFolders.RemoveAt(0);
 				palletLock = true;
 			}
@@ -497,9 +489,9 @@ public class MainClass : MelonMod
 			InstalledModInfos.Clear();
 			NetworkerMenuController.totalInstalled.Clear();
 			ModlistMenu.installPage = 0;
+			handlingInstalled = true;
 			Thread thread = new Thread((ThreadStart)delegate
 			{
-				handlingInstalled = true;
 				PopulateInstalledMods(ModFileManager.MOD_FOLDER_PATH);
 				BackfillManifests();
 				MainThreadManager.QueueAction(delegate
@@ -530,7 +522,6 @@ public class MainClass : MelonMod
 			});
 			thread.Start();
 			loadedInstalled = true;
-			ModlistMenu.Refresh(openMenu: true);
 			refreshInstalledModsRequested = false;
 			if ((UnityEngine.Object)(object)NetworkerMenuController.instance != null)
 			{
@@ -1356,8 +1347,6 @@ public class MainClass : MelonMod
             manifest["root"]["type"] = "pallet-manifest#0";
             manifest["objects"] = objects;
 				string manifestContent = manifest.ToString(Formatting.Indented);
-				// Write subfolder manifest
-				AtomicWriteFile(expectedManifestPath, manifestContent);
 				// Also overwrite top-level manifest (was likely Format A/truncated)
 				string topLevelManifestPath = Path.Combine(ModFileManager.MOD_FOLDER_PATH, barcode + ".manifest");
 				if (topLevelManifestPath != expectedManifestPath)
