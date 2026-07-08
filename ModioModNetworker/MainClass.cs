@@ -269,8 +269,8 @@ public class MainClass : MelonMod
 			installedMods.Clear();
 			InstalledModInfos.Clear();
 			NetworkerMenuController.totalInstalled.Clear();
-			PopulateInstalledMods(ModFileManager.MOD_FOLDER_PATH);
 			BackfillManifests();
+			PopulateInstalledMods(ModFileManager.MOD_FOLDER_PATH);
 			loadedInstalled = true;
 			MelonLogger.Msg("Checking mod.io account subscriptions");
 			PopulateSubscriptions();
@@ -340,7 +340,9 @@ public class MainClass : MelonMod
 
 	public override void OnUpdate()
 	{
-		if (diagUpdateCount < 5) { MelonLogger.Msg("DIAG: OnUpdate tick " + (diagUpdateCount + 1)); }
+		try
+		{
+			if (diagUpdateCount < 5) { MelonLogger.Msg("DIAG: OnUpdate tick " + (diagUpdateCount + 1)); }
 		diagUpdateCount++;
 		foreach (AvatarDownloadBar value3 in AvatarDownloadBar.bars.Values)
 		{
@@ -436,7 +438,7 @@ public class MainClass : MelonMod
 					text = "Updated!";
 					text2 = "This mod has been updated and reloaded.";
 				}
-				if (ModFileManager.activeDownloadQueueElement.notify && ModlistMenu.activeDownloadModInfo != null)
+				if (ModFileManager.activeDownloadQueueElement != null && ModFileManager.activeDownloadQueueElement.notify && ModlistMenu.activeDownloadModInfo != null)
 				{
 					Notifier.Send(new Notification
 					{
@@ -520,8 +522,8 @@ public class MainClass : MelonMod
 			handlingInstalled = true;
 			Thread thread = new Thread((ThreadStart)delegate
 			{
-				PopulateInstalledMods(ModFileManager.MOD_FOLDER_PATH);
 				BackfillManifests();
+				PopulateInstalledMods(ModFileManager.MOD_FOLDER_PATH);
 				MainThreadManager.QueueAction(delegate
 				{
 					if ((UnityEngine.Object)(object)NetworkerMenuController.instance != null)
@@ -567,6 +569,11 @@ public class MainClass : MelonMod
 			{
 				NetworkerMenuController.instance.OnNewTrendingRecieved();
 			}
+		}
+		}
+		catch (Exception ex)
+		{
+			MelonLogger.Error("OnUpdate: Unhandled exception: " + ex.Message);
 		}
 	}
 
