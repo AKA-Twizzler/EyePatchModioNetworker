@@ -389,6 +389,7 @@ public class MainClass : MelonMod
 		}
 		if (subsRefreshing && subscribedModIoNumericalIds.Count >= desiredSubs)
 		{
+			MelonLogger.Msg("DIAG: Notification condition met — subsRefreshing=" + subsRefreshing + ", count=" + subscribedModIoNumericalIds.Count + ", desired=" + desiredSubs);
 			foreach (string toRemoveSubscribedModIoId in toRemoveSubscribedModIoIds)
 			{
 				subscribedModIoNumericalIds.Remove(toRemoveSubscribedModIoId);
@@ -525,6 +526,8 @@ public class MainClass : MelonMod
 			handlingSubscribed = true;
 			subscribedMods.Clear();
 			subscribedModIoNumericalIds.Clear();
+			NetworkerMenuController.modIoRetrieved.Clear();
+			MelonLogger.Msg("DIAG: Refresh start — clearing lists, modIoRetrieved count AFTER clear=" + (NetworkerMenuController.modIoRetrieved?.Count ?? 0));
 			subTotal = 0;
 			subsShown = 0;
 			desiredSubs = 0;
@@ -968,6 +971,7 @@ public class MainClass : MelonMod
 	{
 		string text = subscriptionThreadString;
 		subscriptionThreadString = "";
+		MelonLogger.Msg("DIAG: InternalPopulateSubscriptions started — subTotal=" + subTotal + ", subsShown=" + subsShown + ", modIoRetrieved count=" + (NetworkerMenuController.modIoRetrieved?.Count ?? 0));
 		try
 		{
 			dynamic val = JsonConvert.DeserializeObject<object>(text);
@@ -1077,6 +1081,7 @@ public class MainClass : MelonMod
                 }
                 ReceiveSubModInfo(modInfo);
                 NetworkerMenuController.modIoRetrieved.Add(modInfo);
+                MelonLogger.Msg("DIAG: Added mod to modIoRetrieved — id=" + modInfo.numericalId + ", name=" + modInfo.modName);
             }
             catch (Exception ex)
             {
@@ -1085,6 +1090,7 @@ public class MainClass : MelonMod
             }
         }
 		subsShown += num3;
+		MelonLogger.Msg("DIAG: Page processed — subTotal=" + subTotal + ", subsShown=" + subsShown + ", remaining=" + (subTotal - subsShown));
 		if (subTotal - subsShown > 0)
 		{
 			ModFileManager.QueueSubscriptions(subsShown);
@@ -1092,6 +1098,7 @@ public class MainClass : MelonMod
 		if (subsShown >= subTotal)
 		{
 			subsRefreshing = true;
+			MelonLogger.Msg("DIAG: All pages complete — subsRefreshing=true, desiredSubs=" + desiredSubs + ", subscribedCount=" + subscribedModIoNumericalIds.Count);
 			
 			// Only cross-reference with COMPLETE subscription data
 			// Use snapshot to avoid concurrent modification with background thread
@@ -1111,6 +1118,7 @@ public class MainClass : MelonMod
 			SaveSubscriptionCache();
 			if (NetworkerMenuController.instance != null)
 				NetworkerMenuController.instance.Refresh();
+			MelonLogger.Msg("DIAG: Refresh() called");
 		}
 		}
 		}

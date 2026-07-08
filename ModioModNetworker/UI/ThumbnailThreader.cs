@@ -55,7 +55,7 @@ public class ThumbnailThreader
 						ConnectCallback = async (context, cancellationToken) =>
 						{
 							var hostEntry = await System.Net.Dns.GetHostEntryAsync(context.DnsEndPoint.Host, cancellationToken);
-							var ipv4 = hostEntry.AddressList.First(ip => ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork);
+							var ipv4 = hostEntry.AddressList.FirstOrDefault(ip => ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork) ?? hostEntry.AddressList.First();
 							var socket = new System.Net.Sockets.Socket(ipv4.AddressFamily, System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp)
 							{
 								NoDelay = true
@@ -77,53 +77,61 @@ public class ThumbnailThreader
 						return;
 					}
 				}
-				catch (Exception)
+				catch (Exception ex)
 				{
+					MelonLoader.MelonLogger.Error($"[Diag] DownloadThumbnail: CDN download failed: {ex.Message}");
 				}
 
 				// Fallback: try API endpoint to get logo URL, then download
 				if (apiFallbackUrl != null)
 				{
-					using (var handler = new System.Net.Http.HttpClientHandler
+					try
 					{
-						ServerCertificateCustomValidationCallback = (_, _, _, _) => true
-					})
-					using (var apiClient = new System.Net.Http.HttpClient(handler)
-					{
-						Timeout = TimeSpan.FromSeconds(10)
-					})
-					{
-						apiClient.DefaultRequestHeaders.UserAgent.ParseAdd("ModioModNetworker/2.8.17");
-						apiClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", ModFileManager.OAUTH_KEY);
-						apiClient.DefaultRequestHeaders.Add("X-Modio-Platform", "windows");
-						apiClient.DefaultRequestHeaders.Add("X-Modio-Portal", "steam");
-
-						// Request the logo metadata from API (returns JSON with logo URLs)
-						var jsonResponse = await apiClient.GetAsync(apiFallbackUrl);
-						if (jsonResponse.IsSuccessStatusCode)
+						using (var handler = new System.Net.Http.HttpClientHandler
 						{
-							string jsonBody = await jsonResponse.Content.ReadAsStringAsync();
-							if (jsonBody.Length > 10 && jsonBody[0] == '{')
-							{
-								var logoData = Newtonsoft.Json.Linq.JObject.Parse(jsonBody);
-								// Try thumb_640x360 first, then original, then any URL found
-								string logoUrl = logoData["thumb_640x360"]?.ToString();
-								if (string.IsNullOrEmpty(logoUrl))
-									logoUrl = logoData["original"]?.ToString();
-								if (string.IsNullOrEmpty(logoUrl))
-									logoUrl = logoData["url"]?.ToString();
+							ServerCertificateCustomValidationCallback = (_, _, _, _) => true
+						})
+						using (var apiClient = new System.Net.Http.HttpClient(handler)
+						{
+							Timeout = TimeSpan.FromSeconds(10)
+						})
+						{
+							apiClient.DefaultRequestHeaders.UserAgent.ParseAdd("ModioModNetworker/2.8.17");
+							apiClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", ModFileManager.OAUTH_KEY);
+							apiClient.DefaultRequestHeaders.Add("X-Modio-Platform", "windows");
+							apiClient.DefaultRequestHeaders.Add("X-Modio-Portal", "steam");
 
-								if (!string.IsNullOrEmpty(logoUrl))
+							// Request the logo metadata from API (returns JSON with logo URLs)
+							var jsonResponse = await apiClient.GetAsync(apiFallbackUrl);
+							if (jsonResponse.IsSuccessStatusCode)
+							{
+								string jsonBody = await jsonResponse.Content.ReadAsStringAsync();
+								if (jsonBody.Length > 10 && jsonBody[0] == '{')
 								{
-									byte[] imageBytes = await apiClient.GetByteArrayAsync(logoUrl);
-									if (imageBytes.Length > 1000)
+									var logoData = Newtonsoft.Json.Linq.JObject.Parse(jsonBody);
+									// Try thumb_640x360 first, then original, then any URL found
+									string logoUrl = logoData["thumb_640x360"]?.ToString();
+									if (string.IsNullOrEmpty(logoUrl))
+										logoUrl = logoData["original"]?.ToString();
+									if (string.IsNullOrEmpty(logoUrl))
+										logoUrl = logoData["url"]?.ToString();
+
+									if (!string.IsNullOrEmpty(logoUrl))
 									{
-										CreateTexture(imageBytes, action);
-										return;
+										byte[] imageBytes = await apiClient.GetByteArrayAsync(logoUrl);
+										if (imageBytes.Length > 1000)
+										{
+											CreateTexture(imageBytes, action);
+											return;
+										}
 									}
 								}
 							}
 						}
+					}
+					catch (Exception ex)
+					{
+						MelonLoader.MelonLogger.Error($"[Diag] DownloadThumbnail: API fallback failed: {ex.Message}");
 					}
 				}
 

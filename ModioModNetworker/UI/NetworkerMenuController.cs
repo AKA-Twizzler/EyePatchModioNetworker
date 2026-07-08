@@ -211,6 +211,7 @@ public class NetworkerMenuController : MonoBehaviour
 
 	public void Refresh()
 	{
+		MelonLogger.Msg("DIAG: NetworkerMenuController.Refresh() called — chosenSort=" + chosenSort);
 		if (selectedPanel == Panels.FILES)
 		{
 			if (chosenSort == InstalledSort.SUBSCRIBED && cachedSubscribedList != null)
@@ -229,6 +230,13 @@ public class NetworkerMenuController : MonoBehaviour
 			{
 				SetFilterMode(chosenSort);
 			}
+		}
+		else if (selectedPanel == Panels.MODIO)
+		{
+			maxPages = (int)Math.Ceiling((double)modIoRetrieved.Count / (double)maxDisplayPerPage);
+			if (pageNumber > maxPages) pageNumber = maxPages - 1;
+			PopulateModIoTab(pageNumber);
+			UpdateArrowDisplays();
 		}
 	}
 
