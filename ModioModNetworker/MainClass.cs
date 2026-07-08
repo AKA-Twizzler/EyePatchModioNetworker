@@ -534,7 +534,9 @@ public class MainClass : MelonMod
 			{
 				BackfillManifests();
 				PopulateInstalledMods(ModFileManager.MOD_FOLDER_PATH);
-				MainThreadManager.QueueAction(delegate
+			MainThreadManager.QueueAction(delegate
+			{
+				try
 				{
 					if ((UnityEngine.Object)(object)NetworkerMenuController.instance != null)
 					{
@@ -557,8 +559,12 @@ public class MainClass : MelonMod
 							}
 						}
 					}
-				});
-				handlingInstalled = false;
+				}
+				finally
+				{
+					handlingInstalled = false;
+				}
+			});
 			});
 			thread.Start();
 			loadedInstalled = true;

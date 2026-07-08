@@ -511,7 +511,7 @@ public class NetworkerMenuController : MonoBehaviour
 			}
 			maxPages = (int)Math.Ceiling((double)list.Count / (double)maxDisplayPerPage);
 			UpdateArrowDisplays();
-			PopulateFiles(pageNumber);
+			PopulateFiles(pageNumber, list);
 			break;
 		}
 		case InstalledSort.BLACKLIST:
@@ -724,7 +724,7 @@ public class NetworkerMenuController : MonoBehaviour
 		return val;
 	}
 
-	private void PopulateFiles(int page)
+	private void PopulateFiles(int page, List<ModInfo> source = null)
 	{
 		GameObject gameObject = ((Component)filesTab.transform.Find("GridLayout")).gameObject;
 		int childCount = gameObject.transform.childCount;
@@ -738,13 +738,17 @@ public class NetworkerMenuController : MonoBehaviour
 			}
 			UnityEngine.Object.Destroy((UnityEngine.Object)(object)((Component)child).gameObject);
 		}
+		
+		// Use the provided source list, or fall back to totalInstalled (INSTALLED filter / arrow navigation)
+		List<ModInfo> modsList = source ?? totalInstalled;
+		
 		int num = 0;
-		int num2 = 0;
 		int num3 = page * maxDisplayPerPage;
-		foreach (ModInfo item in totalInstalled)
+		int totalItems = 0;
+		foreach (ModInfo item in modsList)
 		{
-			num2++;
-			if (num2 >= num3 && (chosenSort != InstalledSort.SUBSCRIBED || item.IsSubscribed()))
+			totalItems++;
+			if (totalItems > num3 && num < maxDisplayPerPage)
 			{
 				GameObject val = UnityEngine.Object.Instantiate<GameObject>(NetworkerAssets.modInfoDisplay);
 				ModInfoDisplay modInfoDisplay = val.AddComponent<ModInfoDisplay>();
@@ -755,10 +759,6 @@ public class NetworkerMenuController : MonoBehaviour
 				val.transform.localRotation = Quaternion.identity;
 				val.transform.localScale = Vector3.one;
 				num++;
-				if (num >= maxDisplayPerPage)
-				{
-					break;
-				}
 			}
 		}
 	}
