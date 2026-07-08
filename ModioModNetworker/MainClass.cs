@@ -182,6 +182,18 @@ public class MainClass : MelonMod
 						File.Delete(manifest);
 					}
 				}
+				
+				// One-time purge: delete any leftover subfolder manifests (legacy cleanup)
+				string[] modDirs = Directory.GetDirectories(modFolder);
+				foreach (string dir in modDirs)
+				{
+					string[] subManifests = Directory.GetFiles(dir, "*.manifest");
+					foreach (string subManifest in subManifests)
+					{
+						File.Delete(subManifest);
+					}
+				}
+				
 				MelonLogger.Msg("Pre-init: Cleaned stale mod manifests (NRE prevention)");
 			}
 		}
