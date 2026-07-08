@@ -358,9 +358,16 @@ public class MainClass : MelonMod
 		{
 			MelonLogger.Error("OnUpdate: AvatarDownloadBar error: " + ex.Message);
 		}
-		ThumbnailThreader.HandleQueue();
-		MainThreadManager.HandleQueue();
-		LevelHoldQueue.Update();
+		try
+		{
+			ThumbnailThreader.HandleQueue();
+			MainThreadManager.HandleQueue();
+			LevelHoldQueue.Update();
+		}
+		catch (Exception ex2)
+		{
+			MelonLogger.Error("OnUpdate: Pre-subscription error: " + ex2.Message);
+		}
 		if (ModFileManager.activeDownloadQueueElement != null && ModFileManager.activeDownloadQueueElement.associatedPlayer != null && AvatarDownloadBar.bars.TryGetValue(ModFileManager.activeDownloadQueueElement.associatedPlayer, out AvatarDownloadBar value))
 		{
 			ModInfo activeDownloadModInfo = ModlistMenu.activeDownloadModInfo;
@@ -542,6 +549,11 @@ public class MainClass : MelonMod
 					{
 						NetworkerMenuController.instance.Refresh();
 					}
+					// Reset flags before cross-reference to avoid stale data
+					foreach (ModInfo resetMod in installedMods)
+					{
+						resetMod.isSubscribed = false;
+					}
 					// Re-apply cross-reference data to newly scanned mods
 					CrossReferenceInstalledMods();
 					// Update modinfo.json on disk with fresh subscription data for matched mods
@@ -577,8 +589,14 @@ public class MainClass : MelonMod
 		if (subscriptionThreadString != "" && !_processingSubscriptionData)
 		{
 			_processingSubscriptionData = true;
-			InternalPopulateSubscriptions();
-			_processingSubscriptionData = false;
+			try
+			{
+				InternalPopulateSubscriptions();
+			}
+			finally
+			{
+				_processingSubscriptionData = false;
+			}
 		}
 		if (trendingThreadString != "")
 		{
@@ -1074,6 +1092,25 @@ public class MainClass : MelonMod
 		if (subsShown >= subTotal)
 		{
 			subsRefreshing = true;
+			
+			// Only cross-reference with COMPLETE subscription data
+			// Use snapshot to avoid concurrent modification with background thread
+			try
+			{
+				List<ModInfo> resetSnapshot = new List<ModInfo>(NetworkerMenuController.totalInstalled);
+				foreach (ModInfo resetMod in resetSnapshot)
+				{
+					resetMod.isSubscribed = false;
+				}
+			}
+			catch (Exception snapEx)
+			{
+				MelonLogger.Error("Failed to snapshot totalInstalled for flag reset: " + snapEx.Message);
+			}
+			CrossReferenceInstalledMods();
+			SaveSubscriptionCache();
+			if (NetworkerMenuController.instance != null)
+				NetworkerMenuController.instance.Refresh();
 		}
 		}
 		}
@@ -1081,18 +1118,6 @@ public class MainClass : MelonMod
 		{
 			MelonLogger.Error("Failed to process subscriptions: " + e);
 		}
-		// Reset subscription flags with fresh data - mods no longer subscribed get cleared
-		foreach (ModInfo resetMod in NetworkerMenuController.totalInstalled)
-		{
-			resetMod.isSubscribed = false;
-		}
-		// Now that subscriptions are loaded, cross-reference with installed mods
-		CrossReferenceInstalledMods();
-		// Save subscription data to cache for next startup
-		SaveSubscriptionCache();
-		// Refresh the UI to show updated cross-referenced data
-		if (NetworkerMenuController.instance != null)
-			NetworkerMenuController.instance.Refresh();
 	}
 
 	public void PopulateInstalledMods(string directory)

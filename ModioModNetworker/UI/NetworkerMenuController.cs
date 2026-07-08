@@ -933,7 +933,7 @@ public class NetworkerMenuController : MonoBehaviour
 		{
 			if (chosenSort != InstalledSort.BLACKLIST)
 			{
-				PopulateFiles(pageNumber);
+				SetFilterMode(chosenSort);
 			}
 			else
 			{
