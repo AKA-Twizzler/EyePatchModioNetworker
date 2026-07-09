@@ -1,21 +1,9 @@
-﻿using ModioModNetworker.Data;
-using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using ModioModNetworker.Data;
 
-namespace ModioModNetworker.Utilities
+namespace ModioModNetworker.Utilities;
+
+public class ActionProcessor
 {
-    public class ActionProcessor
-    {
-        List<ModInfo> installedModInfoThreaded = new List<ModInfo>();
-
-
-    }
-
-    public enum ActionType { 
-        REFRESH_INSTALLED,
-        REFRESH_SUBSCRIPTIONS
-    }
+	private List<ModInfo> installedModInfoThreaded = new List<ModInfo>();
 }

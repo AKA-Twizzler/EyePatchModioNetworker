@@ -1,1280 +1,1141 @@
-﻿using BoneLib.BoneMenu;
+using System;
+using System.Collections.Generic;
+using BoneLib.BoneMenu;
+using Il2CppInterop.Runtime.Attributes;
+using Il2CppTMPro;
 using LabFusion.Network;
 using MelonLoader;
 using ModioModNetworker;
 using ModioModNetworker.Data;
-
 using ModioModNetworker.UI;
 using ModioModNetworker.Utilities;
-using Steamworks.Ugc;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Il2CppTMPro;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
-using static System.Net.Mime.MediaTypeNames;
-using static UnityEngine.UI.Image;
 
-namespace ModIoModNetworker.Ui
+namespace ModioModNetworker.UI;
+
+[RegisterTypeInIl2Cpp]
+public class NetworkerMenuController : MonoBehaviour
 {
-    [RegisterTypeInIl2Cpp]
-    public class NetworkerMenuController : MonoBehaviour
-    {
-        public enum Panels { 
-            MODIO,
-            FILES,
-            SETTINGS,
-            MULTIPLAYER,
-            NONE
-        }
-
-        public enum InstalledSort { 
-            INSTALLED,
-            SUBSCRIBED,
-            BLACKLIST
-        }
-
-        public NetworkerMenuController(IntPtr intPtr) : base(intPtr) 
-        { 
-        }
-
-        Panels selectedPanel = Panels.NONE;
-        InstalledSort chosenSort = InstalledSort.INSTALLED;
-
-        GameObject modIoTab;
-        GameObject filesTab;
-        GameObject settingsTab;
-        GameObject multiplayerTab;
-
-        GameObject modProgressDisplay;
-        GameObject keyboardPopup;
-
-        Button upArrowButton;
-        Button downArrowButton;
-
-        TMP_Text typeBarText;
-        GameObject typeBarTextObject;
-        GameObject typeBarEmptyTextObject;
-        GameObject typeBarObject;
-
-        Transform selector;
-        Transform desired;
-        float speed = 10f;
-
-        Button modIoTabButton;
-        Button filesTabButton;
-        Button settingsTabButton;
-        Button multiplayerTabButton;
-
-        GameObject modInfoPopup;
-
-        int pageNumber = 0;
-        int maxPages = 0;
-        int maxDisplayPerPage = 8;
-        int trendingOffset = 0;
-        bool searching = false;
-
-        Animator rootAnimator;
-        public string lastDownloadedTitle = "nothing";
-
-        public static List<ModInfo> totalInstalled = new List<ModInfo>();
-        public static List<ModInfo> modIoRetrieved = new List<ModInfo>();
-        public static List<ModInfo> host = new List<ModInfo>();
-        private static List<GenericSetting> settings = new List<GenericSetting>();
-
-        private static List<StalledAction> stalledActions = new List<StalledAction>();
-
-        ModInfo viewedInfo;
-
-        public static NetworkerMenuController instance;
-
-        public static SpotlightOverride spotlightOverride = new SpotlightOverride();
-
-        
-        void Awake()
-        {
-            instance = this;
-
-            selector = transform.Find("Selector");
-
-            modIoTab = transform.Find("ModIoTab").gameObject;
-            filesTab = transform.Find("FilesTab").gameObject;
-            settingsTab = transform.Find("SettingsTab").gameObject;
-            multiplayerTab = transform.Find("MultiplayerTab").gameObject;
-
-            Button backButton = transform.Find("BackButton").GetComponent<Button>();
-            backButton.onClick.AddListener(new Action(() => {
-                Menu.OpenPage(Page.Root);
-            }));
-
-            Button uninstallUnsubscribedConfirm = filesTab.transform.Find("Confirmer").Find("Confirm").Find("Button").GetComponent<Button>();
-            uninstallUnsubscribedConfirm.onClick.AddListener(new Action(() => {
-                foreach (var modInfo in totalInstalled)
-                {
-                    if (!modInfo.IsSubscribed() && modInfo.IsTracked()) {
-                        ModFileManager.UnInstallMainThread(modInfo.numericalId);
-                    }
-                }
-            }));
-
-            Button installAllConfirm = multiplayerTab.transform.Find("Confirmer").Find("Confirm").Find("Button").GetComponent<Button>();
-            installAllConfirm.onClick.AddListener(new Action(() => {
-                foreach (var modInfo in host)
-                {
-                    ModFileManager.AddToQueue(new DownloadQueueElement()
-                    {
-                        associatedPlayer = null,
-                        info = modInfo
-                    });
-                }
-            }));
-
-            Button refreshSubscribedButton = modIoTab.transform.Find("RefreshSubscribedButton").Find("Button").GetComponent<Button>();
-            refreshSubscribedButton.onClick.AddListener(new Action(() => {
-                MainClass.PopulateSubscriptions();
-            }));
-
-            Button expandedThumbButton = modIoTab.transform.Find("TrendingFirstPage").Find("BigBanner").Find("ThumbnailMaskMovedSlight").Find("Button").GetComponent<Button>();
-            expandedThumbButton.onClick.AddListener(new Action(() =>
-            {
-                if (spotlightOverride.manualDisplayId != null)
-                {
-                    TriggerModInfoPopup(true, spotlightOverride.downloadedInfo);
-                }
-                else {
-                    TriggerModInfoPopup(true, modIoRetrieved[0]);
-                }
-
-            }));
-
-            Button searchButton = modIoTab.transform.Find("SearchIcon").GetComponent<Button>();
-            searchButton.onClick.AddListener(new Action(() => {
-                PopupKeyboard();
-            }));
-
-            upArrowButton = transform.Find("UpArrow").Find("Button").GetComponent<Button>();
-            downArrowButton = transform.Find("DownArrow").Find("Button").GetComponent<Button>();
-            upArrowButton.onClick.AddListener(new Action(() => {
-                OnArrowPress(true);
-            }));
-            downArrowButton.onClick.AddListener(new Action(() => {
-                OnArrowPress(false);
-            }));
-
-            modIoTabButton = transform.Find("SelectableTabs").Find("ModIoTab").GetComponentInChildren<Button>();
-            filesTabButton = transform.Find("SelectableTabs").Find("FileManagementTab").GetComponentInChildren<Button>();
-            settingsTabButton = transform.Find("SelectableTabs").Find("SettingsTab").GetComponentInChildren<Button>();
-            multiplayerTabButton = transform.Find("SelectableTabs").Find("MultiplayerTab").GetComponentInChildren<Button>();
-
-            modIoTab.transform.Find("BackToTrending").Find("BackArrow").Find("Button").gameObject.GetComponent<Button>().onClick.AddListener(new Action(() => { ReturnToTrending(); }));
-
-            modIoTabButton.onClick.AddListener(new Action(() =>
-            {
-                ChangePanel(Panels.MODIO);
-            }));
-            filesTabButton.onClick.AddListener(new Action(() =>
-            {
-                ChangePanel(Panels.FILES);
-            }));
-            settingsTabButton.onClick.AddListener(new Action(() =>
-            {
-                ChangePanel(Panels.SETTINGS);
-            }));
-            multiplayerTabButton.onClick.AddListener(new Action(() =>
-            {
-                ChangePanel(Panels.MULTIPLAYER);
-            }));
-
-            modInfoPopup = transform.parent.Find("ModInfoOverlay").Find("ModInfoPopup").gameObject;
-            modProgressDisplay = transform.parent.Find("ModInstallingDisplay").gameObject;
-            keyboardPopup = transform.parent.Find("KeyboardOverlay").gameObject;
-
-            typeBarObject = keyboardPopup.transform.Find("TypeBar").gameObject;
-            typeBarTextObject = typeBarObject.transform.Find("TypedOutText").gameObject;
-            typeBarEmptyTextObject = typeBarObject.transform.Find("EmptyTextDisplay").gameObject;
-            typeBarText = typeBarTextObject.GetComponent<TMP_Text>();
-
-            rootAnimator = GetComponentInParent<Animator>();
-
-            Button unselectedSubscribe = modInfoPopup.transform.Find("SubscribeUnselected").gameObject.GetComponentInChildren<Button>();
-            Button selectedSubscribe = modInfoPopup.transform.Find("SubscribeSelected").gameObject.GetComponentInChildren<Button>();
-
-            Button unselectedBlacklistPart = modInfoPopup.transform.Find("BlacklistParted").gameObject.GetComponentInChildren<Button>();
-            Button selectedBlacklistPart = modInfoPopup.transform.Find("BlacklistPartedSelected").gameObject.GetComponentInChildren<Button>();
-
-            Button unselectedInstallPart = modInfoPopup.transform.Find("UninstallParted").gameObject.GetComponentInChildren<Button>();
-            Button selectedInstallPart = modInfoPopup.transform.Find("UninstallPartedSelected").gameObject.GetComponentInChildren<Button>();
-
-            Button unselectedBlacklistWhole = modInfoPopup.transform.Find("BlacklistFull").gameObject.GetComponentInChildren<Button>();
-            Button selectedBlacklistWhole = modInfoPopup.transform.Find("BlacklistSelectedFull").gameObject.GetComponentInChildren<Button>();
-
-            Button exitCatcherLeft = modInfoPopup.transform.Find("ExitCatch").gameObject.GetComponentInChildren<Button>();
-            Button exitCatcherRight = modInfoPopup.transform.Find("ExitCatch (1)").gameObject.GetComponentInChildren<Button>();
-
-            Button installedTab = filesTab.transform.Find("InstalledText").GetComponent<Button>();
-            Button subscribedTab = filesTab.transform.Find("SubscribedText").GetComponent<Button>();
-            Button blacklistTab = filesTab.transform.Find("BlacklistText").GetComponent<Button>();
-
-            RegisterWholeKeyboard();
-
-            installedTab.onClick.AddListener(new Action(() => {
-                SetFilterMode(InstalledSort.INSTALLED);
-            }));
-            subscribedTab.onClick.AddListener(new Action(() => {
-                SetFilterMode(InstalledSort.SUBSCRIBED);
-            }));
-            blacklistTab.onClick.AddListener(new Action(() => {
-                SetFilterMode(InstalledSort.BLACKLIST);
-            }));
-
-            exitCatcherLeft.onClick.AddListener(new Action(() =>
-            {
-                TriggerModInfoPopup(false, null);
-            }));
-            exitCatcherRight.onClick.AddListener(new Action(() =>
-            {
-                TriggerModInfoPopup(false, null);
-            }));
-
-            unselectedSubscribe.onClick.AddListener(new Action(() =>
-            {
-                OnSubscribeButtonPressed(false);
-            }));
-            selectedSubscribe.onClick.AddListener(new Action(() =>
-            {
-                OnSubscribeButtonPressed(true);
-            }));
-
-            unselectedBlacklistPart.onClick.AddListener(new Action(() =>
-            {
-                OnBlacklistButtonPressed(false);
-            }));
-            selectedBlacklistPart.onClick.AddListener(new Action(() =>
-            {
-                OnBlacklistButtonPressed(true);
-            }));
-
-            unselectedInstallPart.onClick.AddListener(new Action(() =>
-            {
-                OnInstallButtonPressed(false);
-            }));
-            selectedInstallPart.onClick.AddListener(new Action(() =>
-            {
-                OnInstallButtonPressed(true);
-            }));
-
-            unselectedBlacklistWhole.onClick.AddListener(new Action(() =>
-            {
-                OnBlacklistButtonPressed(false);
-            }));
-            selectedBlacklistWhole.onClick.AddListener(new Action(() =>
-            {
-                OnBlacklistButtonPressed(true);
-            }));
-
-            // Default page is "Files"
-            ChangePanel(Panels.FILES);
-        }
-
-        public void Refresh() {
-            if (selectedPanel == Panels.FILES) {
-                SetFilterMode(chosenSort);
-            }
-        }
-
-        public static void SetHostSubscribedMods(List<ModInfo> modInfos) {
-            host.Clear();
-            host.AddRange(modInfos);
-            MainClass.confirmedHostHasIt = true;
-        }
-
-        public static void AddCheckboxSetting(string title, bool startingValue, Action<bool> onModified) {
-            settings.Add(new CheckboxSetting(title, startingValue, onModified));
-        }
-
-        public static void AddNumericalSetting(string title, int startingValue, int minValue, int maxValue, int increment, Action<int> onModified)
-        {
-            settings.Add(new NumericalSetting(title, startingValue, minValue, maxValue, increment, onModified));
-        }
-
-        public void OnSubscribeButtonPressed(bool selected) {
-            if (selected)
-            {
-                ModFileManager.UnSubscribe(viewedInfo.numericalId);
-                if (viewedInfo.IsInstalled())
-                {
-                    ModFileManager.UnInstall(viewedInfo.numericalId);
-                }
-                MainClass.subscribedModIoNumericalIds.Remove(viewedInfo.numericalId);
-            }
-            else {
-                if (viewedInfo.windowsDownloadLink != "nothing" || viewedInfo.androidDownloadLink != "nothing")
-                {
-                    MainClass.ReceiveSubModInfo(viewedInfo, true);
-                }
-                else
-                {
-                    MainClass.PopulateSubscriptions();
-                }
-                
-                if (!MainClass.subscribedModIoNumericalIds.Contains(viewedInfo.numericalId)) {
-                    MainClass.subscribedModIoNumericalIds.Add(viewedInfo.numericalId);
-                }
-
-                ModFileManager.Subscribe(viewedInfo.numericalId);
-                
-            }
-        }
-
-        private void Search(string query) {
-            searching = true;
-            modIoRetrieved.Clear();
-            PopulateModIoTab(0);
-            ResetPageNumber();
-            trendingOffset = 0;
-            UpdateArrowDisplays();
-            ModFileManager.QueueTrending(0, query);
-            // Close keyboard
-            rootAnimator.SetTrigger("keyboardpopup");
-            SetMainCanvasColliderState(true);
-            modIoTab.transform.Find("BackToTrending").gameObject.SetActive(true);
-            modIoTab.transform.Find("BonelabIcon").gameObject.SetActive(false);
-            modIoTab.transform.Find("SectionText").GetComponent<TMP_Text>().text = $"\"{query}\"";
-        }
-
-        private void ReturnToTrending() {
-            searching = false;
-            modIoRetrieved.Clear();
-            PopulateModIoTab(0);
-            ResetPageNumber();
-            UpdateArrowDisplays();
-            ModFileManager.QueueTrending(0, "");
-            modIoTab.transform.Find("BackToTrending").gameObject.SetActive(false);
-            modIoTab.transform.Find("BonelabIcon").gameObject.SetActive(true);
-            modIoTab.transform.Find("SectionText").GetComponent<TMP_Text>().text = "TRENDING";
-        }
-
-        public void OnBlacklistButtonPressed(bool selected)
-        {
-            if (selected)
-            {
-                if (viewedInfo.modId != null)
-                {
-                    MainClass.blacklistedModIoIds.Remove(viewedInfo.modId);
-                    MainClass.RemoveLineFromBlacklist(viewedInfo.modId);
-                }
-
-                MainClass.blacklistedModIoIds.Remove(viewedInfo.numericalId);
-                MainClass.RemoveLineFromBlacklist(viewedInfo.numericalId);
-
-                
-            }
-            else {
-                if (viewedInfo.modId != null)
-                {
-                    MainClass.blacklistedModIoIds.Add(viewedInfo.modId);
-                    MainClass.WriteLineToBlacklist(viewedInfo.modId);
-                }
-                else {
-                    MainClass.blacklistedModIoIds.Add(viewedInfo.numericalId);
-                    MainClass.WriteLineToBlacklist(viewedInfo.numericalId);
-                }
-
-                if (viewedInfo.IsSubscribed())
-                {
-                    
-                    ModFileManager.UnSubscribe(viewedInfo.numericalId);
-                    if (viewedInfo.IsInstalled())
-                    {
-                        ModFileManager.UnInstall(viewedInfo.numericalId);
-                    }
-                    MainClass.subscribedModIoNumericalIds.Remove(viewedInfo.numericalId);
-                }
-            }
-            UpdateModPopupButtons();
-        }
-
-        public void OnInstallButtonPressed(bool selected)
-        {
-            if (selected)
-            {
-                ModFileManager.UnInstall(viewedInfo.numericalId);
-                if (viewedInfo.IsSubscribed()) {
-                    ModFileManager.UnSubscribe(viewedInfo.numericalId);
-                }
-                MainClass.subscribedModIoNumericalIds.Remove(viewedInfo.numericalId);
-            }
-            else
-            {
-                if (viewedInfo.windowsDownloadLink != null)
-                {
-                    ModFileManager.AddToQueue(new DownloadQueueElement()
-                    {
-                        info = viewedInfo,
-                        associatedPlayer = null,
-                        notify = true
-                    });
-                }
-                else {
-                    // This means its one of those "invalid" ones that only have the numerical id but not any of the
-                    // other data. So we have to request the data ourselves.
-                    ModInfo.RequestModInfoNumerical(viewedInfo.numericalId, "install_native");
-                }
-            }
-        }
-
-        void ResetPageNumber() {
-            pageNumber = 0;
-            maxDisplayPerPage = 8;
-            maxPages = 0;
-        }
-
-        public void TriggerModInfoPopup(bool show, ModInfo modInfo) {
-            rootAnimator = GetComponentInParent<Animator>();
-            rootAnimator.SetTrigger("triggerpopup");
-            if (show)
-            {
-                SetMainCanvasColliderState(false);
-                TMP_Text title = modInfoPopup.transform.Find("ModTitle").GetComponent<TMP_Text>();
-                TMP_Text description = modInfoPopup.transform.Find("Description").GetComponent<TMP_Text>();
-                TMP_Text fileSizeDisplay = modInfoPopup.transform.Find("FileSizeDisplay").GetComponent<TMP_Text>();
-                RawImage thumbnail = modInfoPopup.transform.Find("Thumbnail").GetComponent<RawImage>();
-                title.text = modInfo.modName;
-                description.text = modInfo.modSummary;
-
-                float kb = modInfo.fileSizeKB;
-                float mb = kb / 1000000;
-                float gb = mb / 1000;
-
-                string display = "KB";
-                float value = kb;
-                if (mb > 1)
-                {
-                    value = mb;
-                    display = "MB";
-                }
-                if (gb > 1)
-                {
-                    value = gb;
-                    display = "GB";
-                }
-
-                // Round to 2 decimal places
-                value = Mathf.Round(value * 100f) / 100f;
-                fileSizeDisplay.text = $"({value} {display})";
-
-                ThumbnailThreader.DownloadThumbnail(modInfo.thumbnailLink, (texture =>
-                {
-                    if (thumbnail)
-                    {
-                        thumbnail.texture = texture;
-                    }
-                }));
-                viewedInfo = modInfo;
-                UpdateModPopupButtons();
-            }
-            else {
-                SetMainCanvasColliderState(true);
-            }
-        }
-
-        private void SetMainCanvasColliderState(bool enabled) {
-            foreach (BoxCollider boxCollider in GetComponentsInChildren<BoxCollider>())
-            {
-                boxCollider.enabled = enabled;
-            }
-        }
-
-        public void UpdateModPopupButtons() {
-            if (viewedInfo == null) {
-                return;
-            }
-            ModInfo modInfo = viewedInfo;
-            GameObject unselectedSubscribe = modInfoPopup.transform.Find("SubscribeUnselected").gameObject;
-            GameObject selectedSubscribe = modInfoPopup.transform.Find("SubscribeSelected").gameObject;
-
-            GameObject unselectedBlacklistPart = modInfoPopup.transform.Find("BlacklistParted").gameObject;
-            GameObject selectedBlacklistPart = modInfoPopup.transform.Find("BlacklistPartedSelected").gameObject;
-
-            GameObject unselectedInstallPart = modInfoPopup.transform.Find("UninstallParted").gameObject;
-            GameObject selectedInstallPart = modInfoPopup.transform.Find("UninstallPartedSelected").gameObject;
-
-            GameObject unselectedBlacklistWhole = modInfoPopup.transform.Find("BlacklistFull").gameObject;
-            GameObject selectedBlacklistWhole = modInfoPopup.transform.Find("BlacklistSelectedFull").gameObject;
-
-            unselectedSubscribe.SetActive(false);
-            selectedSubscribe.SetActive(false);
-            unselectedBlacklistPart.SetActive(false);
-            selectedBlacklistPart.SetActive(false);
-            unselectedInstallPart.SetActive(false);
-            selectedInstallPart.SetActive(false);
-            unselectedBlacklistWhole.SetActive(false);
-            selectedBlacklistWhole.SetActive(false);
-            
-
-            bool installed = modInfo.IsInstalled();
-            bool subscribed = modInfo.IsSubscribed();
-
-            if (subscribed)
-            {
-                unselectedSubscribe.SetActive(false);
-                selectedSubscribe.SetActive(true);
-            }
-            else {
-                unselectedSubscribe.SetActive(true);
-                selectedSubscribe.SetActive(false);
-            }
-           
-
-            bool shouldBeParted = false;
-
-            if (installed)
-            {
-                shouldBeParted = true;
-                selectedInstallPart.SetActive(true);
-                unselectedInstallPart.SetActive(false);
-            }
-
-            if (shouldBeParted)
-            {
-                selectedBlacklistWhole.SetActive(false);
-                unselectedBlacklistWhole.SetActive(false);
-
-                if (modInfo.IsBlacklisted())
-                {
-                    selectedBlacklistPart.SetActive(true);
-                    unselectedBlacklistPart.SetActive(false);
-                }
-                else
-                {
-                    selectedBlacklistPart.SetActive(false);
-                    unselectedBlacklistPart.SetActive(true);
-                }
-            }
-            else
-            {
-                if (modInfo.IsBlacklisted())
-                {
-                    selectedBlacklistWhole.SetActive(true);
-                    unselectedBlacklistWhole.SetActive(false);
-                }
-                else
-                {
-                    selectedBlacklistWhole.SetActive(false);
-                    unselectedBlacklistWhole.SetActive(true);
-                }
-            }
-        }
-
-        public void SetFilterMode(InstalledSort installedSort) {
-            chosenSort = installedSort;
-            ResetPageNumber();
-            switch (installedSort)
-            {
-                case InstalledSort.INSTALLED:
-                    filesTab.transform.Find("GridLayout").gameObject.SetActive(true);
-                    filesTab.transform.Find("ListLayout").gameObject.SetActive(false);
-                    filesTab.transform.Find("UninstallUnsubscribedModsButton").gameObject.SetActive(true);
-                    maxPages = (int) Math.Ceiling((double) totalInstalled.Count / (double) maxDisplayPerPage);
-                    UpdateArrowDisplays();
-                    PopulateFiles(pageNumber);
-                    
-                    break;
-                case InstalledSort.SUBSCRIBED:
-                    filesTab.transform.Find("GridLayout").gameObject.SetActive(true);
-                    filesTab.transform.Find("ListLayout").gameObject.SetActive(false);
-                    filesTab.transform.Find("UninstallUnsubscribedModsButton").gameObject.SetActive(false);
-                    List<ModInfo> subscribedInfos = new List<ModInfo>();
-                    foreach (ModInfo info in totalInstalled)
-                    {
-                        if (info.IsSubscribed())
-                        {
-                            subscribedInfos.Add(info);
-                        }
-                    }
-                    maxPages = (int) Math.Ceiling((double) subscribedInfos.Count / (double) maxDisplayPerPage);
-                    UpdateArrowDisplays();
-                    PopulateFiles(pageNumber);
-                    break;
-                case InstalledSort.BLACKLIST:
-                    filesTab.transform.Find("GridLayout").gameObject.SetActive(false);
-                    filesTab.transform.Find("ListLayout").gameObject.SetActive(true);
-                    filesTab.transform.Find("UninstallUnsubscribedModsButton").gameObject.SetActive(false);
-                    maxPages = (int) Math.Ceiling((double) MainClass.blacklistedModIoIds.Count / (double) 4);
-                    UpdateArrowDisplays();
-                    PopulateBlacklist(pageNumber);
-                    break;
-            }
-        }
-
-        public void PopulateBlacklist(int page) {
-            GameObject listView = filesTab.transform.Find("ListLayout").gameObject;
-
-            int childCount = listView.transform.childCount;
-            for (int i = 0; i < childCount; i++)
-            {
-                Transform child = listView.transform.GetChild(i);
-                Destroy(child.gameObject);
-            }
-
-            int starting = 4 * page;
-            for (int i = 0; i < 4; i++)
-            {
-                if (MainClass.blacklistedModIoIds.Count > starting + i)
-                {
-                    string original = MainClass.blacklistedModIoIds[starting + i];
-                    string modDisplay = original;
-                    bool isNumeric = int.TryParse(modDisplay, out int n);
-                    if (isNumeric) {
-                        modDisplay = "Numeric Listing: "+n;
-                    }
-                    GameObject blacklistDisplay = Instantiate(NetworkerAssets.blacklistDisplayPrefab);
-                    TMP_Text displayName = blacklistDisplay.transform.Find("BlacklistedMod").gameObject.GetComponent<TMP_Text>();
-                    displayName.text = modDisplay;
-                    Button xButton = blacklistDisplay.transform.Find("XButton").Find("Button").gameObject.GetComponent<Button>();
-
-                    xButton.onClick.AddListener(new Action(() => {
-                        MainClass.blacklistedModIoIds.Remove(original);
-                        maxPages = (int) Math.Ceiling((double) MainClass.blacklistedModIoIds.Count / (double) 4);
-                        PopulateBlacklist(pageNumber);
-                        MainClass.RemoveLineFromBlacklist(original);
-                    }));
-
-                    blacklistDisplay.transform.parent = listView.transform;
-                    blacklistDisplay.transform.localPosition = Vector3.forward;
-                    blacklistDisplay.transform.localRotation = Quaternion.identity;
-                    blacklistDisplay.transform.localScale = Vector3.one;
-                }
-            }
-        }
-
-        public void OnNewTrendingRecieved()
-        {
-            if (selectedPanel == Panels.MODIO) {
-                if (maxPages >= 1)
-                {
-                    PopulateModIoTab(maxPages - 1);
-                }
-                else {
-                    PopulateModIoTab(0);
-                }
-                maxPages = (int) Math.Ceiling((double) modIoRetrieved.Count / (double) maxDisplayPerPage);
-                UpdateArrowDisplays();
-                SetMainCanvasColliderState(true);
-            }
-        }
-
-        void PopulateModIoTab(int page) {
-
-            if (page > 0 || searching)
-            {
-                GameObject gridView = modIoTab.transform.Find("GridLayout").gameObject;
-                GameObject trendingFirstPage = modIoTab.transform.Find("TrendingFirstPage").gameObject;
-
-   
-                trendingFirstPage.SetActive(false);
-                gridView.SetActive(true);
-
-                ClearAllChildren(gridView.transform);
-
-                // TODO: set max display to 4 if we are trending and on the first page
-                // Also switch destination parent to the trending one
-                // If we are not viewing trending (And rather, a specified mod), offset by 1 by adding
-                // Apply that given offset to the target below?
-                // Subtract 4 from starting otherwise 
-
-                int starting = maxDisplayPerPage * page;
-
-                if (!searching) {
-                    // Account for the two missing
-                    if (starting > 0) {
-                        starting -= 2;
-                    }
-
-                    // Account for the extra missing because we aren't listing it in 1 2 3 order anymore
-                    
-                    if (spotlightOverride.manualDisplayId != null)
-                    {
-                        starting -= 1;
-                    }
-                }
-
-                for (int i = 0; i < maxDisplayPerPage; i++)
-                {
-                    if (modIoRetrieved.Count > starting + i)
-                    {
-                        ModInfo modInfo = modIoRetrieved[starting + i];
-                        MakeModInfoObject(gridView.transform, modInfo);
-    
-                    }
-                }
-            }
-            else {
-                // Handle it specially
-                GameObject gridView = modIoTab.transform.Find("GridLayout").gameObject;
-
-                Transform trendingFirstPageTransform = modIoTab.transform.Find("TrendingFirstPage");
-                GameObject trendingFirstPage = trendingFirstPageTransform.gameObject;
-                Transform bigBanner = trendingFirstPageTransform.Find("BigBanner");
-
-                trendingFirstPage.SetActive(true);
-                gridView.SetActive(false);
-
-                Transform secondaryGridView = trendingFirstPageTransform.Find("GridLayoutTrending");
-                Transform individualSpecialSpawn = trendingFirstPageTransform.Find("ModInfoSpawnPoint");
-
-                ClearAllChildren(secondaryGridView);
-                ClearAllChildren(individualSpecialSpawn);
-
-
-                int starting = 1;
-
-                if (spotlightOverride.manualDisplayId != null) {
-                    starting--;
-                }
-
-                if (modIoRetrieved.Count == 0)
-                {
-                    bigBanner.gameObject.SetActive(false);
-                    return;
-                }
-                else
-                {
-                    bigBanner.gameObject.SetActive(true);
-                }
-
-                GameObject intentionalSpawn = MakeModInfoObject(individualSpecialSpawn, modIoRetrieved[starting]);
-                RectTransform spawnRect = intentionalSpawn.GetComponent<RectTransform>();
-                RectTransform destRect = individualSpecialSpawn.GetComponent<RectTransform>();
-
-                spawnRect.position = destRect.position;
-
-                starting++;
-
-                for (int i = 0; i < 4; i++) {
-
-                    if (modIoRetrieved.Count > starting + i)
-                    {
-                        ModInfo modInfo = modIoRetrieved[starting + i];
-                        MakeModInfoObject(secondaryGridView, modInfo);
-                    }
-                }
-
-                
-                TMP_Text modTitleText = bigBanner.Find("ModTitleText").GetComponent<TMP_Text>();
-                TMP_Text descriptionText = bigBanner.Find("Description").GetComponent<TMP_Text>();
-
-                Transform thumbMask = bigBanner.Find("ThumbnailMaskMovedSlight");
-                RawImage thumbNail = thumbMask.Find("LargeThumbnail").GetComponent<RawImage>();
-
-                
-
-                ModInfo targetInfo = modIoRetrieved[0];
-
-                if (spotlightOverride.downloadedInfo != null) {
-
-                    targetInfo = spotlightOverride.downloadedInfo;
-                }
-
-                /*if (spotlightOverride.cachedThumbnail != null)
-                {
-                    thumbNail.texture = spotlightOverride.cachedThumbnail;
-                }
-                else {
-                    ThumbnailThreader.DownloadThumbnail(targetInfo.thumbnailLink, (texture =>
-                    {
-                        if (thumbNail)
-                        {
-                            thumbNail.texture = texture;
-                        }
-
-                        spotlightOverride.cachedThumbnail = texture;
-                    }));
-                }*/
-
-                ThumbnailThreader.DownloadThumbnail(targetInfo.thumbnailLink, (texture =>
-                {
-                    if (thumbNail)
-                    {
-                        thumbNail.texture = texture;
-                    }
-
-                    spotlightOverride.cachedThumbnail = texture;
-                }));
-
-
-                GameObject bottomBar = thumbMask.transform.Find("BottomBar").gameObject;
-
-                if (spotlightOverride.subTitle != null)
-                {
-                    bottomBar.SetActive(true);
-                    TMP_Text titleText = bottomBar.transform.Find("OptionalTitle").GetComponent<TMP_Text>();
-
-                    titleText.text = spotlightOverride.subTitle;
-                }
-                else {
-                    bottomBar.SetActive(false);
-                }
-
-                if (spotlightOverride.titleOverride != null)
-                {
-                    modTitleText.text = spotlightOverride.titleOverride;
-                }
-                else {
-                    modTitleText.text = targetInfo.modName;
-                }
-
-                if (spotlightOverride.descriptionOverride != null)
-                {
-                    descriptionText.text = spotlightOverride.descriptionOverride;
-                }
-                else
-                {
-                    descriptionText.text = targetInfo.modSummary;
-                }
-            }
-            
-        }
-
-        void ClearAllChildren(Transform parent) {
-            int childCount = parent.childCount;
-            for (int i = 0; i < childCount; i++)
-            {
-                Transform child = parent.GetChild(i);
-                ModInfoDisplay modInfoDisplay = child.GetComponentInChildren<ModInfoDisplay>();
-
-                if (modInfoDisplay)
-                {
-                    modInfoDisplay.DestroyThumbnail();
-                }
-                Destroy(child.gameObject);
-            }
-        }
-
-        GameObject MakeModInfoObject(Transform parent, ModInfo modInfo, bool zeroPosition = true) {
-
-
-            GameObject modInfoPanel = Instantiate(NetworkerAssets.modInfoDisplay);
-            ModInfoDisplay modInfoDisplay = modInfoPanel.AddComponent<ModInfoDisplay>();
-            modInfoDisplay.SetModInfo(modInfo);
-            modInfoDisplay.controller = this;
-            modInfoPanel.transform.parent = parent.transform;
-
-            if (zeroPosition) {
-                modInfoPanel.transform.localPosition = Vector3.forward;
-                modInfoPanel.transform.localRotation = Quaternion.identity;
-            }
-            
-            modInfoPanel.transform.localScale = Vector3.one;
-
-            return modInfoPanel;
-        }
-
-        void PopulateFiles(int page) {
-            GameObject gridView = filesTab.transform.Find("GridLayout").gameObject;
-
-            int childCount = gridView.transform.childCount;
-            for (int i = 0; i < childCount; i++) {
-                Transform child = gridView.transform.GetChild(i);
-                ModInfoDisplay modInfoDisplay = child.GetComponentInChildren<ModInfoDisplay>();
-
-                if (modInfoDisplay)
-                {
-                    // Manual texture removing nonsense
-                    modInfoDisplay.DestroyThumbnail();
-                }
-                Destroy(child.gameObject);
-            }
-
-            int shown = 0;
-            int loop = 0;
-            int starting = page * maxDisplayPerPage;
-
-            foreach (ModInfo modInfo in totalInstalled) {
-                loop++;
-                if (loop < starting) {
-                    continue;
-                }
-                if (chosenSort == InstalledSort.SUBSCRIBED)
-                {
-                    if (!modInfo.IsSubscribed())
-                    {
-                        continue;
-                    }
-                }
-                GameObject modInfoPanel = Instantiate(NetworkerAssets.modInfoDisplay);
-                ModInfoDisplay modInfoDisplay = modInfoPanel.AddComponent<ModInfoDisplay>();
-                modInfoDisplay.SetModInfo(modInfo);
-                modInfoDisplay.controller = this;
-                modInfoPanel.transform.parent = gridView.transform;
-                modInfoPanel.transform.localPosition = Vector3.forward;
-                modInfoPanel.transform.localRotation = Quaternion.identity;
-                modInfoPanel.transform.localScale = Vector3.one;
-                shown++;
-                if (shown >= maxDisplayPerPage) {
-                    break;
-                }
-            }
-        }
-
-        void PopulateHostMods(int page)
-        {
-            GameObject gridView = multiplayerTab.transform.Find("GridLayout").gameObject;
-
-            int childCount = gridView.transform.childCount;
-            for (int i = 0; i < childCount; i++)
-            {
-                Transform child = gridView.transform.GetChild(i);
-                ModInfoDisplay modInfoDisplay = child.GetComponentInChildren<ModInfoDisplay>();
-                if (modInfoDisplay) {
-                    // Manual texture removing nonsense
-                    modInfoDisplay.DestroyThumbnail();
-                }
-
-                Destroy(child.gameObject);
-            }
-
-            int shown = 0;
-            int loop = 0;
-            int starting = page * maxDisplayPerPage;
-
-            foreach (ModInfo modInfo in host)
-            {
-                loop++;
-                if (loop < starting)
-                {
-                    continue;
-                }
-            
-                GameObject modInfoPanel = Instantiate(NetworkerAssets.modInfoDisplay);
-                ModInfoDisplay modInfoDisplay = modInfoPanel.AddComponent<ModInfoDisplay>();
-                modInfoDisplay.SetModInfo(modInfo);
-                modInfoDisplay.controller = this;
-                modInfoPanel.transform.parent = gridView.transform;
-                modInfoPanel.transform.localPosition = Vector3.forward;
-                modInfoPanel.transform.localRotation = Quaternion.identity;
-                modInfoPanel.transform.localScale = Vector3.one;
-                shown++;
-                if (shown >= maxDisplayPerPage)
-                {
-                    break;
-                }
-            }
-        }
-
-        void PopulateSettings(int page)
-        {
-            GameObject settingsHolder = settingsTab.transform.Find("SettingsHolder").gameObject;
-         
-            int childCount = settingsHolder.transform.childCount;
-            for (int i = 0; i < childCount; i++)
-            {
-                Transform child = settingsHolder.transform.GetChild(i);
-                Destroy(child.gameObject);
-            }
-         
-            int starting = 3 * page;
-            for (int i = 0; i < 3; i++)
-            {
-                if (settings.Count > starting + i)
-                {
-                    GenericSetting genericSetting = settings[starting + i];
-                    genericSetting.SpawnPrefab(settingsHolder.transform);
-                }
-            }
-        }
-
-        void ChangePanel(Panels panel) {
-            ResetPageNumber();
-            selectedPanel = panel;
-            switch (panel) {
-                case Panels.FILES:
-                    SetSelectorDesired(filesTabButton.transform.parent.Find("SelectorDesiredPos"));
-                    SetFilterMode(chosenSort);
-                    break;
-                case Panels.MODIO:
-                    maxPages = (int) Math.Ceiling((double) modIoRetrieved.Count / (double) maxDisplayPerPage);
-                    UpdateArrowDisplays();
-                    SetSelectorDesired(modIoTabButton.transform.parent.Find("SelectorDesiredPos"));
-                    PopulateModIoTab(pageNumber);
-                    break;
-                case Panels.SETTINGS:
-                    maxPages = (int) Math.Ceiling((double) settings.Count / (double) 3);
-                    UpdateArrowDisplays();
-                    SetSelectorDesired(settingsTabButton.transform.parent.Find("SelectorDesiredPos"));
-                    PopulateSettings(pageNumber);
-                    break;
-                case Panels.MULTIPLAYER:
-                    maxPages = (int) Math.Ceiling((double) host.Count / (double) maxDisplayPerPage);
-                    UpdateArrowDisplays();
-                    SetSelectorDesired(multiplayerTabButton.transform.parent.Find("SelectorDesiredPos"));
-                    PopulateHostMods(pageNumber);
-                    TMP_Text text = multiplayerTab.transform.Find("InstallAllHostModsButton").Find("Text (TMP)").GetComponent<TMP_Text>();
-
-                    float totalSize = 0;
-                    int missingMods = 0;
-                    foreach (var modInfo in host)
-                    {
-                        if (!modInfo.IsInstalled())
-                        {
-                            missingMods++;
-                            totalSize += modInfo.fileSizeKB;
-                        }
-                    }
-                    float kb = totalSize;
-                    float mb = kb / 1000000;
-                    float gb = mb / 1000;
-
-                    string display = "KB";
-                    float value = kb;
-                    if (mb > 1)
-                    {
-                        value = mb;
-                        display = "MB";
-                    }
-                    if (gb > 1)
-                    {
-                        value = gb;
-                        display = "GB";
-                    }
-
-                    // Round to 2 decimal places
-                    value = Mathf.Round(value * 100f) / 100f;
-                    text.text = $"Install Host Mods ({missingMods}) ({value} {display})";
-
-                    break;
-            }
-        }
-
-        void UpdateArrowDisplays() {
-            GameObject upArrow = upArrowButton.transform.parent.gameObject;
-            GameObject downArrow = downArrowButton.transform.parent.gameObject;
-            upArrow.SetActive(pageNumber > 0);
-            downArrow.SetActive(pageNumber < maxPages - 1);
-
-            // Set down arrow to always active on the mod.io tab.
-            if (selectedPanel == Panels.MODIO) {
-                // But only if theres a large amount of mods. It means that there probably IS more to request. (Trending but not searches)
-                if (modIoRetrieved.Count > 80) {
-                    downArrow.SetActive(true);
-                }
-            }
-        }
-
-        void OnArrowPress(bool up) {
-            if (!up)
-            {
-                pageNumber++;
-            }
-            else {
-                pageNumber--;
-            }
-
-            if (pageNumber < 0) {
-                pageNumber = 0;
-            }
-
-            if (selectedPanel == Panels.MODIO) {
-                if (pageNumber == maxPages-1 && modIoRetrieved.Count > 80) {
-                    trendingOffset++;
-                    if (searching)
-                    {
-                        // Continue with more search query results
-                        ModFileManager.QueueTrending(trendingOffset * 100, KeyboardManager.typed);
-                    }
-                    else {
-                        // Trending
-                        ModFileManager.QueueTrending(trendingOffset * 100);
-                    }
-                }
-            }
-
-            if (pageNumber > maxPages) {
-                pageNumber = maxPages;
-                
-            }
-
-            if (selectedPanel == Panels.MULTIPLAYER) {
-                PopulateHostMods(pageNumber);
-            }
-
-            if (selectedPanel == Panels.FILES) {
-                if (chosenSort != InstalledSort.BLACKLIST)
-                {
-                    PopulateFiles(pageNumber);
-                }
-                else {
-                    PopulateBlacklist(pageNumber);
-                }
-            }
-
-            if (selectedPanel == Panels.MODIO)
-            {
-                PopulateModIoTab(pageNumber);
-            }
-
-            if (selectedPanel == Panels.SETTINGS)
-            {
-                PopulateSettings(pageNumber);
-            }
-
-            UpdateArrowDisplays();
-        }
-
-        private void RegisterWholeKeyboard() {
-            // HILARIOUS KEYBOARD HAHAHA 
-            // Swipez can you add a keyboard??? Swipez can you??? Can you do this?? Can you do that???
-            // Can I STRANGE YOU TO DEATH??? CAN I CHOKE YOU UNTIL YOU TURN BLUE AND EXPLODE????? MAYBE!!!! MAYBE I CAN!!!! HAHAHAHAHAHAHAHA
-            // https://www.youtube.com/watch?v=eTrUEuUlsrw
-            RegisterKey("Q");
-            RegisterKey("W");
-            RegisterKey("E");
-            RegisterKey("R");
-            RegisterKey("T");
-            RegisterKey("Y");
-            RegisterKey("U");
-            RegisterKey("I");
-            RegisterKey("O");
-            RegisterKey("P");
-            RegisterKey("A");
-            RegisterKey("S");
-            RegisterKey("D");
-            RegisterKey("F");
-            RegisterKey("G");
-            RegisterKey("H");
-            RegisterKey("J");
-            RegisterKey("K");
-            RegisterKey("L");
-            RegisterKey("Z");
-            RegisterKey("X");
-            RegisterKey("C");
-            RegisterKey("V");
-            RegisterKey("B");
-            RegisterKey("N");
-            RegisterKey("M");
-            RegisterKey("1");
-            RegisterKey("2");
-            RegisterKey("3");
-            RegisterKey("4");
-            RegisterKey("5");
-            RegisterKey("6");
-            RegisterKey("7");
-            RegisterKey("8");
-            RegisterKey("9");
-            RegisterKey("0");
-            RegisterKey(".");
-            RegisterKey(",");
-            RegisterKey("'");
-            RegisterKey("-");
-            RegisterKey("=");
-            SetKeyAction("Backspace", () => { 
-                KeyboardManager.Backspace();
-            });
-            SetKeyAction("Space", () => {
-                KeyboardManager.Append(" ");
-            });
-            SetKeyAction("Enter", () => {
-                Search(KeyboardManager.typed);
-            });
-            SetKeyAction("Exit", () => {
-                rootAnimator.SetTrigger("keyboardpopup");
-                SetMainCanvasColliderState(true);
-            });
-        }
-
-        public void Reset() {
-            transform.parent.Find("ModInfoOverlay").gameObject.SetActive(false);
-            keyboardPopup.gameObject.SetActive(false);
-            GetComponent<CanvasGroup>().interactable = true;
-            SetMainCanvasColliderState(true);
-        }
-
-        private void RegisterKey(string keyName) {
-            SetKeyAction(keyName, new Action(() => {
-                KeyboardManager.Append(keyName);
-            }));
-        }
-
-        private void PopupKeyboard() {
-            rootAnimator.SetTrigger("keyboardpopup");
-            SetMainCanvasColliderState(false);
-        }
-
-        private void SetKeyAction(string keyName, Action action)
-        {
-            GameObject key = keyboardPopup.transform.Find("Keyboard").Find(keyName).gameObject;
-            Button button = key.GetComponent<Button>();
-            button.onClick.AddListener(action);
-        }
-
-        // Update is called once per frame
-        void Update()
-        {
-            List<StalledAction> toRemove = new List<StalledAction>();
-            foreach (StalledAction stalledAction in stalledActions) {
-                stalledAction.frameCount--;
-                if (stalledAction.frameCount == 0) {
-                    stalledAction.action.Invoke();
-                    toRemove.Add(stalledAction);
-                }
-                
-            }
-            stalledActions.RemoveAll((stall) => toRemove.Contains(stall));
-            if (desired != null && selector != null)
-            {
-                selector.position = Vector3.Lerp(selector.position, desired.position, speed * Time.deltaTime);
-            }
-            if (ModFileManager.activeDownloadQueueElement != null)
-            {
-                modProgressDisplay.SetActive(true);
-                RawImage thumbnail = modProgressDisplay.transform.Find("Thumbnail").gameObject.GetComponent<RawImage>();
-                if ((lastDownloadedTitle != ModFileManager.activeDownloadQueueElement.info.modName)) {
-                    lastDownloadedTitle = ModFileManager.activeDownloadQueueElement.info.modName;
-                    ThumbnailThreader.DownloadThumbnail(ModFileManager.activeDownloadQueueElement.info.thumbnailLink, (thumb =>
-                    {
-                        thumbnail.texture = thumb;
-                    }));
-                }
-                TMP_Text title = modProgressDisplay.transform.Find("Title").gameObject.GetComponent<TMP_Text>();
-                title.text = ModFileManager.activeDownloadQueueElement.info.modName;
-                TMP_Text progress = modProgressDisplay.transform.Find("Percentage").gameObject.GetComponent<TMP_Text>();
-                progress.text = ((int)Math.Round(ModlistMenu.activeDownloadModInfo.modDownloadPercentage)) + "%";
-            }
-            else {
-                lastDownloadedTitle = "nothing";
-                modProgressDisplay.SetActive(false);
-            }
-
-            if (multiplayerTabButton) {
-                multiplayerTabButton.transform.parent.gameObject.SetActive(NetworkInfo.HasServer);
-            }
-
-            if (keyboardPopup) {
-                typeBarText.text = KeyboardManager.typed;
-                if (KeyboardManager.typed == "")
-                {
-                    typeBarTextObject.SetActive(false);
-                    typeBarEmptyTextObject.SetActive(true);
-                }
-                else {
-                    typeBarTextObject.SetActive(true);
-                    typeBarEmptyTextObject.SetActive(false);
-                }
-            }
-        }
-
-        public void SetSelectorDesired(Transform transform)
-        {
-            desired = transform;
-        }
-    }
-}
-
-public class StalledAction {
-    public int frameCount;
-    public Action action;
+	public NetworkerMenuController(IntPtr intPtr) : base(intPtr) { }
+	public enum Panels
+	{
+		MODIO,
+		FILES,
+		SETTINGS,
+		MULTIPLAYER,
+		NONE
+	}
+
+	public enum InstalledSort
+	{
+		INSTALLED,
+		SUBSCRIBED,
+		BLACKLIST
+	}
+
+	private Panels selectedPanel = Panels.NONE;
+
+	private InstalledSort chosenSort = InstalledSort.INSTALLED;
+
+	private GameObject modIoTab;
+
+	private GameObject filesTab;
+
+	private GameObject settingsTab;
+
+	private GameObject multiplayerTab;
+
+	private GameObject modProgressDisplay;
+
+	private GameObject keyboardPopup;
+
+	private Button upArrowButton;
+
+	private Button downArrowButton;
+
+	private TMP_Text typeBarText;
+
+	private GameObject typeBarTextObject;
+
+	private GameObject typeBarEmptyTextObject;
+
+	private GameObject typeBarObject;
+
+	private Transform selector;
+
+	private Transform desired;
+
+	private float speed = 10f;
+
+	private Button modIoTabButton;
+
+	private Button filesTabButton;
+
+	private Button settingsTabButton;
+
+	private Button multiplayerTabButton;
+
+	private GameObject modInfoPopup;
+
+	private int pageNumber = 0;
+
+	private int maxPages = 0;
+
+	private int maxDisplayPerPage = 8;
+
+	private int trendingOffset = 0;
+
+	private bool searching = false;
+
+	private Animator rootAnimator;
+
+	public string lastDownloadedTitle = "nothing";
+
+	public static List<ModInfo> totalInstalled = new List<ModInfo>();
+
+	public static List<ModInfo> modIoRetrieved = new List<ModInfo>();
+
+	public static List<ModInfo> host = new List<ModInfo>();
+
+	private static List<GenericSetting> settings = new List<GenericSetting>();
+
+	private static List<StalledAction> stalledActions = new List<StalledAction>();
+
+	private ModInfo viewedInfo;
+
+	public static NetworkerMenuController instance;
+
+	public static SpotlightOverride spotlightOverride = new SpotlightOverride();
+
+	private List<ModInfo> cachedSubscribedList = null;
+
+	private void Awake()
+	{
+		instance = this;
+		selector = ((Component)this).transform.Find("Selector");
+		modIoTab = ((Component)((Component)this).transform.Find("ModIoTab")).gameObject;
+		filesTab = ((Component)((Component)this).transform.Find("FilesTab")).gameObject;
+		settingsTab = ((Component)((Component)this).transform.Find("SettingsTab")).gameObject;
+		multiplayerTab = ((Component)((Component)this).transform.Find("MultiplayerTab")).gameObject;
+		Button component = ((Component)((Component)this).transform.Find("BackButton")).GetComponent<Button>();
+		component.onClick.AddListener(new System.Action(() => Menu.OpenPage(Page.Root)));
+		Button component2 = ((Component)filesTab.transform.Find("Confirmer").Find("Confirm").Find("Button")).GetComponent<Button>();
+		component2.onClick.AddListener(new System.Action(() => {
+			foreach (ModInfo item in totalInstalled)
+			{
+				if (!item.IsSubscribed() && item.IsTracked())
+				{
+					ModFileManager.UnInstallMainThread(item.numericalId);
+				}
+			}
+		}));
+		Button component3 = ((Component)multiplayerTab.transform.Find("Confirmer").Find("Confirm").Find("Button")).GetComponent<Button>();
+		component3.onClick.AddListener(new System.Action(() => {
+			foreach (ModInfo item2 in host)
+			{
+				ModFileManager.AddToQueue(new DownloadQueueElement
+				{
+					associatedPlayer = null,
+					info = item2
+				});
+			}
+		}));
+		Button component4 = ((Component)modIoTab.transform.Find("RefreshSubscribedButton").Find("Button")).GetComponent<Button>();
+		component4.onClick.AddListener(new System.Action(() => MainClass.PopulateSubscriptions()));
+		Button component5 = ((Component)modIoTab.transform.Find("TrendingFirstPage").Find("BigBanner").Find("ThumbnailMaskMovedSlight")
+			.Find("Button")).GetComponent<Button>();
+		component5.onClick.AddListener(new System.Action(() => {
+			if (spotlightOverride.manualDisplayId != null)
+			{
+				TriggerModInfoPopup(show: true, spotlightOverride.downloadedInfo);
+			}
+			else
+			{
+				TriggerModInfoPopup(show: true, modIoRetrieved[0]);
+			}
+		}));
+		Button component6 = ((Component)modIoTab.transform.Find("SearchIcon")).GetComponent<Button>();
+		component6.onClick.AddListener(new System.Action(() => PopupKeyboard()));
+		upArrowButton = ((Component)((Component)this).transform.Find("UpArrow").Find("Button")).GetComponent<Button>();
+		downArrowButton = ((Component)((Component)this).transform.Find("DownArrow").Find("Button")).GetComponent<Button>();
+		upArrowButton.onClick.AddListener(new System.Action(() => OnArrowPress(up: true)));
+		downArrowButton.onClick.AddListener(new System.Action(() => OnArrowPress(up: false)));
+		modIoTabButton = ((Component)((Component)this).transform.Find("SelectableTabs").Find("ModIoTab")).GetComponentInChildren<Button>();
+		filesTabButton = ((Component)((Component)this).transform.Find("SelectableTabs").Find("FileManagementTab")).GetComponentInChildren<Button>();
+		settingsTabButton = ((Component)((Component)this).transform.Find("SelectableTabs").Find("SettingsTab")).GetComponentInChildren<Button>();
+		multiplayerTabButton = ((Component)((Component)this).transform.Find("SelectableTabs").Find("MultiplayerTab")).GetComponentInChildren<Button>();
+		((Component)modIoTab.transform.Find("BackToTrending").Find("BackArrow").Find("Button")).gameObject.GetComponent<Button>().onClick.AddListener(new System.Action(() => ReturnToTrending()));
+		modIoTabButton.onClick.AddListener(new System.Action(() => ChangePanel(Panels.MODIO)));
+		filesTabButton.onClick.AddListener(new System.Action(() => ChangePanel(Panels.FILES)));
+		settingsTabButton.onClick.AddListener(new System.Action(() => ChangePanel(Panels.SETTINGS)));
+		multiplayerTabButton.onClick.AddListener(new System.Action(() => ChangePanel(Panels.MULTIPLAYER)));
+		modInfoPopup = ((Component)((Component)this).transform.parent.Find("ModInfoOverlay").Find("ModInfoPopup")).gameObject;
+		modProgressDisplay = ((Component)((Component)this).transform.parent.Find("ModInstallingDisplay")).gameObject;
+		keyboardPopup = ((Component)((Component)this).transform.parent.Find("KeyboardOverlay")).gameObject;
+		typeBarObject = ((Component)keyboardPopup.transform.Find("TypeBar")).gameObject;
+		typeBarTextObject = ((Component)typeBarObject.transform.Find("TypedOutText")).gameObject;
+		typeBarEmptyTextObject = ((Component)typeBarObject.transform.Find("EmptyTextDisplay")).gameObject;
+		typeBarText = typeBarTextObject.GetComponent<TMP_Text>();
+		rootAnimator = ((Component)this).GetComponentInParent<Animator>();
+		Button componentInChildren = ((Component)modInfoPopup.transform.Find("SubscribeUnselected")).gameObject.GetComponentInChildren<Button>();
+		Button componentInChildren2 = ((Component)modInfoPopup.transform.Find("SubscribeSelected")).gameObject.GetComponentInChildren<Button>();
+		Button componentInChildren3 = ((Component)modInfoPopup.transform.Find("BlacklistParted")).gameObject.GetComponentInChildren<Button>();
+		Button componentInChildren4 = ((Component)modInfoPopup.transform.Find("BlacklistPartedSelected")).gameObject.GetComponentInChildren<Button>();
+		Button componentInChildren5 = ((Component)modInfoPopup.transform.Find("UninstallParted")).gameObject.GetComponentInChildren<Button>();
+		Button componentInChildren6 = ((Component)modInfoPopup.transform.Find("UninstallPartedSelected")).gameObject.GetComponentInChildren<Button>();
+		Button componentInChildren7 = ((Component)modInfoPopup.transform.Find("BlacklistFull")).gameObject.GetComponentInChildren<Button>();
+		Button componentInChildren8 = ((Component)modInfoPopup.transform.Find("BlacklistSelectedFull")).gameObject.GetComponentInChildren<Button>();
+		Button componentInChildren9 = ((Component)modInfoPopup.transform.Find("ExitCatch")).gameObject.GetComponentInChildren<Button>();
+		Button componentInChildren10 = ((Component)modInfoPopup.transform.Find("ExitCatch (1)")).gameObject.GetComponentInChildren<Button>();
+		Button component7 = ((Component)filesTab.transform.Find("InstalledText")).GetComponent<Button>();
+		Button component8 = ((Component)filesTab.transform.Find("SubscribedText")).GetComponent<Button>();
+		Button component9 = ((Component)filesTab.transform.Find("BlacklistText")).GetComponent<Button>();
+		RegisterWholeKeyboard();
+		component7.onClick.AddListener(new System.Action(() => SetFilterMode(InstalledSort.INSTALLED)));
+		component8.onClick.AddListener(new System.Action(() => SetFilterMode(InstalledSort.SUBSCRIBED)));
+		component9.onClick.AddListener(new System.Action(() => SetFilterMode(InstalledSort.BLACKLIST)));
+		componentInChildren9.onClick.AddListener(new System.Action(() => TriggerModInfoPopup(show: false, null)));
+		componentInChildren10.onClick.AddListener(new System.Action(() => TriggerModInfoPopup(show: false, null)));
+		componentInChildren.onClick.AddListener(new System.Action(() => OnSubscribeButtonPressed(selected: false)));
+		componentInChildren2.onClick.AddListener(new System.Action(() => OnSubscribeButtonPressed(selected: true)));
+		componentInChildren3.onClick.AddListener(new System.Action(() => OnBlacklistButtonPressed(selected: false)));
+		componentInChildren4.onClick.AddListener(new System.Action(() => OnBlacklistButtonPressed(selected: true)));
+		componentInChildren5.onClick.AddListener(new System.Action(() => OnInstallButtonPressed(selected: false)));
+		componentInChildren6.onClick.AddListener(new System.Action(() => OnInstallButtonPressed(selected: true)));
+		componentInChildren7.onClick.AddListener(new System.Action(() => OnBlacklistButtonPressed(selected: false)));
+		componentInChildren8.onClick.AddListener(new System.Action(() => OnBlacklistButtonPressed(selected: true)));
+		ChangePanel(Panels.FILES);
+	}
+
+	public void Refresh()
+	{
+		MelonLogger.Msg("DIAG: NetworkerMenuController.Refresh() called — chosenSort=" + chosenSort);
+		if (selectedPanel == Panels.FILES)
+		{
+			if (chosenSort == InstalledSort.SUBSCRIBED && cachedSubscribedList != null)
+			{
+				maxPages = (int)Math.Ceiling((double)cachedSubscribedList.Count / (double)maxDisplayPerPage);
+				if (pageNumber > maxPages) pageNumber = maxPages - 1;
+				PopulateFiles(pageNumber, cachedSubscribedList);
+			}
+			else if (chosenSort == InstalledSort.INSTALLED)
+			{
+				maxPages = (int)Math.Ceiling((double)totalInstalled.Count / (double)maxDisplayPerPage);
+				if (pageNumber > maxPages) pageNumber = maxPages - 1;
+				PopulateFiles(pageNumber);
+			}
+			else
+			{
+				SetFilterMode(chosenSort);
+			}
+		}
+		else if (selectedPanel == Panels.MODIO)
+		{
+			maxPages = (int)Math.Ceiling((double)modIoRetrieved.Count / (double)maxDisplayPerPage);
+			if (pageNumber > maxPages) pageNumber = maxPages - 1;
+			if (modIoRetrieved.Count > 0) PopulateModIoTab(pageNumber);
+			UpdateArrowDisplays();
+		}
+	}
+
+	public static void SetHostSubscribedMods(List<ModInfo> modInfos)
+	{
+		host.Clear();
+		host.AddRange(modInfos);
+		MainClass.confirmedHostHasIt = true;
+	}
+
+	public static void AddCheckboxSetting(string title, bool startingValue, Action<bool> onModified)
+	{
+		settings.Add(new CheckboxSetting(title, startingValue, onModified));
+	}
+
+	public static void AddNumericalSetting(string title, int startingValue, int minValue, int maxValue, int increment, Action<int> onModified)
+	{
+		settings.Add(new NumericalSetting(title, startingValue, minValue, maxValue, increment, onModified));
+	}
+
+	public void OnSubscribeButtonPressed(bool selected)
+	{
+		if (selected)
+		{
+			ModFileManager.UnSubscribe(viewedInfo.numericalId);
+			if (viewedInfo.IsInstalled())
+			{
+				ModFileManager.UnInstall(viewedInfo.numericalId);
+			}
+			MainClass.subscribedModIoNumericalIds.Remove(viewedInfo.numericalId);
+			return;
+		}
+		if (viewedInfo.windowsDownloadLink != "nothing" || viewedInfo.androidDownloadLink != "nothing")
+		{
+			MainClass.ReceiveSubModInfo(viewedInfo, ignoreTag: true);
+		}
+		else
+		{
+			MainClass.PopulateSubscriptions();
+		}
+		if (!MainClass.subscribedModIoNumericalIds.Contains(viewedInfo.numericalId))
+		{
+			MainClass.subscribedModIoNumericalIds.Add(viewedInfo.numericalId);
+		}
+		ModFileManager.Subscribe(viewedInfo.numericalId);
+	}
+
+	private void Search(string query)
+	{
+		searching = true;
+		modIoRetrieved.Clear();
+		PopulateModIoTab(0);
+		ResetPageNumber();
+		trendingOffset = 0;
+		UpdateArrowDisplays();
+		ModFileManager.QueueTrending(0, query);
+		rootAnimator.SetTrigger("keyboardpopup");
+		SetMainCanvasColliderState(enabled: true);
+		((Component)modIoTab.transform.Find("BackToTrending")).gameObject.SetActive(true);
+		((Component)modIoTab.transform.Find("BonelabIcon")).gameObject.SetActive(false);
+		((Component)modIoTab.transform.Find("SectionText")).GetComponent<TMP_Text>().text = "\"" + query + "\"";
+	}
+
+	private void ReturnToTrending()
+	{
+		searching = false;
+		modIoRetrieved.Clear();
+		PopulateModIoTab(0);
+		ResetPageNumber();
+		UpdateArrowDisplays();
+		ModFileManager.QueueTrending(0);
+		((Component)modIoTab.transform.Find("BackToTrending")).gameObject.SetActive(false);
+		((Component)modIoTab.transform.Find("BonelabIcon")).gameObject.SetActive(true);
+		((Component)modIoTab.transform.Find("SectionText")).GetComponent<TMP_Text>().text = "TRENDING";
+	}
+
+	public void OnBlacklistButtonPressed(bool selected)
+	{
+		if (selected)
+		{
+			if (viewedInfo.modId != null)
+			{
+				MainClass.blacklistedModIoIds.Remove(viewedInfo.modId);
+				MainClass.RemoveLineFromBlacklist(viewedInfo.modId);
+			}
+			MainClass.blacklistedModIoIds.Remove(viewedInfo.numericalId);
+			MainClass.RemoveLineFromBlacklist(viewedInfo.numericalId);
+		}
+		else
+		{
+			if (viewedInfo.modId != null)
+			{
+				MainClass.blacklistedModIoIds.Add(viewedInfo.modId);
+				MainClass.WriteLineToBlacklist(viewedInfo.modId);
+			}
+			else
+			{
+				MainClass.blacklistedModIoIds.Add(viewedInfo.numericalId);
+				MainClass.WriteLineToBlacklist(viewedInfo.numericalId);
+			}
+			if (viewedInfo.IsSubscribed())
+			{
+				ModFileManager.UnSubscribe(viewedInfo.numericalId);
+				if (viewedInfo.IsInstalled())
+				{
+					ModFileManager.UnInstall(viewedInfo.numericalId);
+				}
+				MainClass.subscribedModIoNumericalIds.Remove(viewedInfo.numericalId);
+			}
+		}
+		UpdateModPopupButtons();
+	}
+
+	public void OnInstallButtonPressed(bool selected)
+	{
+		if (selected)
+		{
+			ModFileManager.UnInstall(viewedInfo.numericalId);
+			if (viewedInfo.IsSubscribed())
+			{
+				ModFileManager.UnSubscribe(viewedInfo.numericalId);
+			}
+			MainClass.subscribedModIoNumericalIds.Remove(viewedInfo.numericalId);
+		}
+		else if (viewedInfo.windowsDownloadLink != null)
+		{
+			ModFileManager.AddToQueue(new DownloadQueueElement
+			{
+				info = viewedInfo,
+				associatedPlayer = null,
+				notify = true
+			});
+		}
+		else
+		{
+			ModInfo.RequestModInfoNumerical(viewedInfo.numericalId, "install_native");
+		}
+	}
+
+	private void ResetPageNumber()
+	{
+		pageNumber = 0;
+		maxDisplayPerPage = 8;
+		maxPages = 0;
+	}
+
+	[HideFromIl2Cpp]
+	public void TriggerModInfoPopup(bool show, ModInfo modInfo)
+	{
+		rootAnimator = ((Component)this).GetComponentInParent<Animator>();
+		rootAnimator.SetTrigger("triggerpopup");
+		if (show)
+		{
+			SetMainCanvasColliderState(enabled: false);
+			TMP_Text component = ((Component)modInfoPopup.transform.Find("ModTitle")).GetComponent<TMP_Text>();
+			TMP_Text component2 = ((Component)modInfoPopup.transform.Find("Description")).GetComponent<TMP_Text>();
+			TMP_Text component3 = ((Component)modInfoPopup.transform.Find("FileSizeDisplay")).GetComponent<TMP_Text>();
+			RawImage thumbnail = ((Component)modInfoPopup.transform.Find("Thumbnail")).GetComponent<RawImage>();
+			component.text = modInfo.modName;
+			MelonLogger.Msg($"[Diag] TriggerModInfoPopup - modName={modInfo?.modName ?? "null"} fileSizeKB={modInfo?.fileSizeKB} numericalId={modInfo?.numericalId ?? "null"} thumbnailLink={(modInfo?.thumbnailLink != null && modInfo?.thumbnailLink.Length > 0 ? "SET" : "null")} subscribed={modInfo?.IsSubscribed()}");
+			component2.text = modInfo.modSummary;
+			float fileSizeKB = modInfo.fileSizeKB;
+			float num = fileSizeKB / 1000000f;
+			float num2 = num / 1000f;
+			string value = "KB";
+			float num3 = fileSizeKB;
+			if (num > 1f)
+			{
+				num3 = num;
+				value = "MB";
+			}
+			if (num2 > 1f)
+			{
+				num3 = num2;
+				value = "GB";
+			}
+			num3 = Mathf.Round(num3 * 100f) / 100f;
+			component3.text = $"({num3} {value})";
+			ThumbnailThreader.DownloadThumbnail(modInfo.thumbnailLink, delegate(Texture texture)
+			{
+				if (thumbnail != null)
+				{
+					thumbnail.texture = texture;
+				}
+			});
+			viewedInfo = modInfo;
+			UpdateModPopupButtons();
+		}
+		else
+		{
+			SetMainCanvasColliderState(enabled: true);
+		}
+	}
+
+	private void SetMainCanvasColliderState(bool enabled)
+	{
+		foreach (BoxCollider componentsInChild in ((Component)this).GetComponentsInChildren<BoxCollider>())
+		{
+			((Collider)componentsInChild).enabled = enabled;
+		}
+	}
+
+	public void UpdateModPopupButtons()
+	{
+		if (viewedInfo == null)
+		{
+			return;
+		}
+		ModInfo modInfo = viewedInfo;
+		GameObject gameObject = ((Component)modInfoPopup.transform.Find("SubscribeUnselected")).gameObject;
+		GameObject gameObject2 = ((Component)modInfoPopup.transform.Find("SubscribeSelected")).gameObject;
+		GameObject gameObject3 = ((Component)modInfoPopup.transform.Find("BlacklistParted")).gameObject;
+		GameObject gameObject4 = ((Component)modInfoPopup.transform.Find("BlacklistPartedSelected")).gameObject;
+		GameObject gameObject5 = ((Component)modInfoPopup.transform.Find("UninstallParted")).gameObject;
+		GameObject gameObject6 = ((Component)modInfoPopup.transform.Find("UninstallPartedSelected")).gameObject;
+		GameObject gameObject7 = ((Component)modInfoPopup.transform.Find("BlacklistFull")).gameObject;
+		GameObject gameObject8 = ((Component)modInfoPopup.transform.Find("BlacklistSelectedFull")).gameObject;
+		gameObject.SetActive(false);
+		gameObject2.SetActive(false);
+		gameObject3.SetActive(false);
+		gameObject4.SetActive(false);
+		gameObject5.SetActive(false);
+		gameObject6.SetActive(false);
+		gameObject7.SetActive(false);
+		gameObject8.SetActive(false);
+		bool flag = modInfo.IsInstalled();
+		if (modInfo.IsSubscribed())
+		{
+			gameObject.SetActive(false);
+			gameObject2.SetActive(true);
+		}
+		else
+		{
+			gameObject.SetActive(true);
+			gameObject2.SetActive(false);
+		}
+		bool flag2 = false;
+		if (flag)
+		{
+			flag2 = true;
+			gameObject6.SetActive(true);
+			gameObject5.SetActive(false);
+		}
+		if (flag2)
+		{
+			gameObject8.SetActive(false);
+			gameObject7.SetActive(false);
+			if (modInfo.IsBlacklisted())
+			{
+				gameObject4.SetActive(true);
+				gameObject3.SetActive(false);
+			}
+			else
+			{
+				gameObject4.SetActive(false);
+				gameObject3.SetActive(true);
+			}
+		}
+		else if (modInfo.IsBlacklisted())
+		{
+			gameObject8.SetActive(true);
+			gameObject7.SetActive(false);
+		}
+		else
+		{
+			gameObject8.SetActive(false);
+			gameObject7.SetActive(true);
+		}
+	}
+
+	public void SetFilterMode(InstalledSort installedSort)
+	{
+		chosenSort = installedSort;
+		ResetPageNumber();
+		switch (installedSort)
+		{
+		case InstalledSort.INSTALLED:
+			((Component)filesTab.transform.Find("GridLayout")).gameObject.SetActive(true);
+			((Component)filesTab.transform.Find("ListLayout")).gameObject.SetActive(false);
+			((Component)filesTab.transform.Find("UninstallUnsubscribedModsButton")).gameObject.SetActive(true);
+			maxPages = (int)Math.Ceiling((double)totalInstalled.Count / (double)maxDisplayPerPage);
+			UpdateArrowDisplays();
+			cachedSubscribedList = null;
+			PopulateFiles(pageNumber);
+			break;
+		case InstalledSort.SUBSCRIBED:
+		{
+			((Component)filesTab.transform.Find("GridLayout")).gameObject.SetActive(true);
+			((Component)filesTab.transform.Find("ListLayout")).gameObject.SetActive(false);
+			((Component)filesTab.transform.Find("UninstallUnsubscribedModsButton")).gameObject.SetActive(false);
+			List<ModInfo> list = new List<ModInfo>();
+			foreach (ModInfo item in totalInstalled)
+			{
+				if (item.IsSubscribed())
+				{
+					list.Add(item);
+				}
+			}
+			cachedSubscribedList = list;
+			maxPages = (int)Math.Ceiling((double)list.Count / (double)maxDisplayPerPage);
+			UpdateArrowDisplays();
+			PopulateFiles(pageNumber, list);
+			break;
+		}
+		case InstalledSort.BLACKLIST:
+			((Component)filesTab.transform.Find("GridLayout")).gameObject.SetActive(false);
+			((Component)filesTab.transform.Find("ListLayout")).gameObject.SetActive(true);
+			((Component)filesTab.transform.Find("UninstallUnsubscribedModsButton")).gameObject.SetActive(false);
+			maxPages = (int)Math.Ceiling((double)MainClass.blacklistedModIoIds.Count / 4.0);
+			UpdateArrowDisplays();
+			PopulateBlacklist(pageNumber);
+			break;
+		}
+	}
+
+	public void PopulateBlacklist(int page)
+	{
+		GameObject gameObject = ((Component)filesTab.transform.Find("ListLayout")).gameObject;
+		int childCount = gameObject.transform.childCount;
+		for (int i = 0; i < childCount; i++)
+		{
+			Transform child = gameObject.transform.GetChild(i);
+			UnityEngine.Object.Destroy((UnityEngine.Object)(object)((Component)child).gameObject);
+		}
+		int num = 4 * page;
+		for (int j = 0; j < 4; j++)
+		{
+			if (MainClass.blacklistedModIoIds.Count > num + j)
+			{
+				string original = MainClass.blacklistedModIoIds[num + j];
+				string text = original;
+				if (int.TryParse(text, out var result))
+				{
+					text = "Numeric Listing: " + result;
+				}
+				GameObject val = UnityEngine.Object.Instantiate<GameObject>(NetworkerAssets.blacklistDisplayPrefab);
+				TMP_Text component = ((Component)val.transform.Find("BlacklistedMod")).gameObject.GetComponent<TMP_Text>();
+				component.text = text;
+				Button component2 = ((Component)val.transform.Find("XButton").Find("Button")).gameObject.GetComponent<Button>();
+				component2.onClick.AddListener(new System.Action(() => {
+					MainClass.blacklistedModIoIds.Remove(original);
+					maxPages = (int)Math.Ceiling((double)MainClass.blacklistedModIoIds.Count / 4.0);
+					PopulateBlacklist(pageNumber);
+					MainClass.RemoveLineFromBlacklist(original);
+				}));
+				val.transform.parent = gameObject.transform;
+				val.transform.localPosition = Vector3.forward;
+				val.transform.localRotation = Quaternion.identity;
+				val.transform.localScale = Vector3.one;
+			}
+		}
+	}
+
+	public void OnNewTrendingRecieved()
+	{
+		if (maxPages >= 1)
+		{
+			PopulateModIoTab(maxPages - 1);
+		}
+		else
+		{
+			PopulateModIoTab(0);
+		}
+		maxPages = (int)Math.Ceiling((double)modIoRetrieved.Count / (double)maxDisplayPerPage);
+		UpdateArrowDisplays();
+		SetMainCanvasColliderState(enabled: true);
+	}
+
+	private void PopulateModIoTab(int page)
+	{
+		if (page > 0 || searching)
+		{
+			GameObject gameObject = ((Component)modIoTab.transform.Find("GridLayout")).gameObject;
+			GameObject gameObject2 = ((Component)modIoTab.transform.Find("TrendingFirstPage")).gameObject;
+			gameObject2.SetActive(false);
+			gameObject.SetActive(true);
+			ClearAllChildren(gameObject.transform);
+			int num = maxDisplayPerPage * page;
+			if (!searching)
+			{
+				if (num > 0)
+				{
+					num -= 2;
+				}
+				if (spotlightOverride.manualDisplayId != null)
+				{
+					num--;
+				}
+			}
+			for (int i = 0; i < maxDisplayPerPage; i++)
+			{
+				if (modIoRetrieved.Count > num + i)
+				{
+					ModInfo modInfo = modIoRetrieved[num + i];
+					MakeModInfoObject(gameObject.transform, modInfo);
+				}
+			}
+			return;
+		}
+		GameObject gameObject3 = ((Component)modIoTab.transform.Find("GridLayout")).gameObject;
+		Transform val = modIoTab.transform.Find("TrendingFirstPage");
+		GameObject gameObject4 = ((Component)val).gameObject;
+		Transform val2 = val.Find("BigBanner");
+		gameObject4.SetActive(true);
+		gameObject3.SetActive(false);
+		Transform parent = val.Find("GridLayoutTrending");
+		Transform val3 = val.Find("ModInfoSpawnPoint");
+		ClearAllChildren(parent);
+		ClearAllChildren(val3);
+		int num2 = 1;
+		if (spotlightOverride.manualDisplayId != null)
+		{
+			num2--;
+		}
+		if (modIoRetrieved.Count == 0)
+		{
+			((Component)val2).gameObject.SetActive(false);
+			return;
+		}
+		((Component)val2).gameObject.SetActive(true);
+		GameObject val4 = MakeModInfoObject(val3, modIoRetrieved[num2]);
+		RectTransform component = val4.GetComponent<RectTransform>();
+		RectTransform component2 = ((Component)val3).GetComponent<RectTransform>();
+		((Transform)component).position = ((Transform)component2).position;
+		num2++;
+		for (int j = 0; j < 4; j++)
+		{
+			if (modIoRetrieved.Count > num2 + j)
+			{
+				ModInfo modInfo2 = modIoRetrieved[num2 + j];
+				MakeModInfoObject(parent, modInfo2);
+			}
+		}
+		TMP_Text component3 = ((Component)val2.Find("ModTitleText")).GetComponent<TMP_Text>();
+		TMP_Text component4 = ((Component)val2.Find("Description")).GetComponent<TMP_Text>();
+		Transform val5 = val2.Find("ThumbnailMaskMovedSlight");
+		RawImage thumbNail = ((Component)val5.Find("LargeThumbnail")).GetComponent<RawImage>();
+		ModInfo modInfo3 = modIoRetrieved[0];
+		if (spotlightOverride.downloadedInfo != null)
+		{
+			modInfo3 = spotlightOverride.downloadedInfo;
+		}
+		ThumbnailThreader.DownloadThumbnail(modInfo3.thumbnailLink, delegate(Texture texture)
+		{
+			if (thumbNail != null)
+			{
+				thumbNail.texture = texture;
+			}
+			spotlightOverride.cachedThumbnail = texture;
+		});
+		GameObject gameObject5 = ((Component)((Component)val5).transform.Find("BottomBar")).gameObject;
+		if (spotlightOverride.subTitle != null)
+		{
+			gameObject5.SetActive(true);
+			TMP_Text component5 = ((Component)gameObject5.transform.Find("OptionalTitle")).GetComponent<TMP_Text>();
+			component5.text = spotlightOverride.subTitle;
+		}
+		else
+		{
+			gameObject5.SetActive(false);
+		}
+		if (spotlightOverride.titleOverride != null)
+		{
+			component3.text = spotlightOverride.titleOverride;
+		}
+		else
+		{
+			component3.text = modInfo3.modName;
+		}
+		if (spotlightOverride.descriptionOverride != null)
+		{
+			component4.text = spotlightOverride.descriptionOverride;
+		}
+		else
+		{
+			component4.text = modInfo3.modSummary;
+		}
+	}
+
+	private void ClearAllChildren(Transform parent)
+	{
+		int childCount = parent.childCount;
+		for (int i = 0; i < childCount; i++)
+		{
+			Transform child = parent.GetChild(i);
+			ModInfoDisplay componentInChildren = ((Component)child).GetComponentInChildren<ModInfoDisplay>();
+			if (componentInChildren != null)
+			{
+				componentInChildren.DestroyThumbnail();
+			}
+			UnityEngine.Object.Destroy((UnityEngine.Object)(object)((Component)child).gameObject);
+		}
+	}
+
+	[HideFromIl2Cpp]
+	private GameObject MakeModInfoObject(Transform parent, ModInfo modInfo, bool zeroPosition = true)
+	{
+		GameObject val = UnityEngine.Object.Instantiate<GameObject>(NetworkerAssets.modInfoDisplay);
+		ModInfoDisplay modInfoDisplay = val.AddComponent<ModInfoDisplay>();
+		modInfoDisplay.SetModInfo(modInfo);
+		modInfoDisplay.controller = this;
+		val.transform.parent = ((Component)parent).transform;
+		if (zeroPosition)
+		{
+			val.transform.localPosition = Vector3.forward;
+			val.transform.localRotation = Quaternion.identity;
+		}
+		val.transform.localScale = Vector3.one;
+		return val;
+	}
+
+	private void PopulateFiles(int page, List<ModInfo> source = null)
+	{
+		GameObject gameObject = ((Component)filesTab.transform.Find("GridLayout")).gameObject;
+		int childCount = gameObject.transform.childCount;
+		for (int i = 0; i < childCount; i++)
+		{
+			Transform child = gameObject.transform.GetChild(i);
+			ModInfoDisplay componentInChildren = ((Component)child).GetComponentInChildren<ModInfoDisplay>();
+			if (componentInChildren != null)
+			{
+				componentInChildren.DestroyThumbnail();
+			}
+			UnityEngine.Object.Destroy((UnityEngine.Object)(object)((Component)child).gameObject);
+		}
+		
+		// Use the provided source list, or fall back to totalInstalled (INSTALLED filter / arrow navigation)
+		List<ModInfo> modsList = source ?? totalInstalled;
+		
+		int num = 0;
+		int num3 = page * maxDisplayPerPage;
+		int totalItems = 0;
+		foreach (ModInfo item in modsList)
+		{
+			totalItems++;
+			if (totalItems > num3 && num < maxDisplayPerPage)
+			{
+				GameObject val = UnityEngine.Object.Instantiate<GameObject>(NetworkerAssets.modInfoDisplay);
+				ModInfoDisplay modInfoDisplay = val.AddComponent<ModInfoDisplay>();
+				modInfoDisplay.SetModInfo(item);
+				modInfoDisplay.controller = this;
+				val.transform.parent = gameObject.transform;
+				val.transform.localPosition = Vector3.forward;
+				val.transform.localRotation = Quaternion.identity;
+				val.transform.localScale = Vector3.one;
+				num++;
+			}
+		}
+	}
+
+	private void PopulateHostMods(int page)
+	{
+		GameObject gameObject = ((Component)multiplayerTab.transform.Find("GridLayout")).gameObject;
+		int childCount = gameObject.transform.childCount;
+		for (int i = 0; i < childCount; i++)
+		{
+			Transform child = gameObject.transform.GetChild(i);
+			ModInfoDisplay componentInChildren = ((Component)child).GetComponentInChildren<ModInfoDisplay>();
+			if (componentInChildren != null)
+			{
+				componentInChildren.DestroyThumbnail();
+			}
+			UnityEngine.Object.Destroy((UnityEngine.Object)(object)((Component)child).gameObject);
+		}
+		int num = 0;
+		int num2 = 0;
+		int num3 = page * maxDisplayPerPage;
+		foreach (ModInfo item in host)
+		{
+			num2++;
+			if (num2 >= num3)
+			{
+				GameObject val = UnityEngine.Object.Instantiate<GameObject>(NetworkerAssets.modInfoDisplay);
+				ModInfoDisplay modInfoDisplay = val.AddComponent<ModInfoDisplay>();
+				modInfoDisplay.SetModInfo(item);
+				modInfoDisplay.controller = this;
+				val.transform.parent = gameObject.transform;
+				val.transform.localPosition = Vector3.forward;
+				val.transform.localRotation = Quaternion.identity;
+				val.transform.localScale = Vector3.one;
+				num++;
+				if (num >= maxDisplayPerPage)
+				{
+					break;
+				}
+			}
+		}
+	}
+
+	private void PopulateSettings(int page)
+	{
+		GameObject gameObject = ((Component)settingsTab.transform.Find("SettingsHolder")).gameObject;
+		int childCount = gameObject.transform.childCount;
+		for (int i = 0; i < childCount; i++)
+		{
+			Transform child = gameObject.transform.GetChild(i);
+			UnityEngine.Object.Destroy((UnityEngine.Object)(object)((Component)child).gameObject);
+		}
+		int num = 3 * page;
+		for (int j = 0; j < 3; j++)
+		{
+			if (settings.Count > num + j)
+			{
+				GenericSetting genericSetting = settings[num + j];
+				genericSetting.SpawnPrefab(gameObject.transform);
+			}
+		}
+	}
+
+	private void ChangePanel(Panels panel)
+	{
+		ResetPageNumber();
+		selectedPanel = panel;
+		switch (panel)
+		{
+		case Panels.FILES:
+			SetSelectorDesired(((Component)filesTabButton).transform.parent.Find("SelectorDesiredPos"));
+			SetFilterMode(chosenSort);
+			break;
+		case Panels.MODIO:
+			maxPages = (int)Math.Ceiling((double)modIoRetrieved.Count / (double)maxDisplayPerPage);
+			UpdateArrowDisplays();
+			SetSelectorDesired(((Component)modIoTabButton).transform.parent.Find("SelectorDesiredPos"));
+			PopulateModIoTab(pageNumber);
+			break;
+		case Panels.SETTINGS:
+			maxPages = (int)Math.Ceiling((double)settings.Count / 3.0);
+			UpdateArrowDisplays();
+			SetSelectorDesired(((Component)settingsTabButton).transform.parent.Find("SelectorDesiredPos"));
+			PopulateSettings(pageNumber);
+			break;
+		case Panels.MULTIPLAYER:
+		{
+			maxPages = (int)Math.Ceiling((double)host.Count / (double)maxDisplayPerPage);
+			UpdateArrowDisplays();
+			SetSelectorDesired(((Component)multiplayerTabButton).transform.parent.Find("SelectorDesiredPos"));
+			PopulateHostMods(pageNumber);
+			TMP_Text component = ((Component)multiplayerTab.transform.Find("InstallAllHostModsButton").Find("Text (TMP)")).GetComponent<TMP_Text>();
+			float num = 0f;
+			int num2 = 0;
+			foreach (ModInfo item in host)
+			{
+				if (!item.IsInstalled())
+				{
+					num2++;
+					num += item.fileSizeKB;
+				}
+			}
+			float num3 = num;
+			float num4 = num3 / 1000000f;
+			float num5 = num4 / 1000f;
+			string value = "KB";
+			float num6 = num3;
+			if (num4 > 1f)
+			{
+				num6 = num4;
+				value = "MB";
+			}
+			if (num5 > 1f)
+			{
+				num6 = num5;
+				value = "GB";
+			}
+			num6 = Mathf.Round(num6 * 100f) / 100f;
+			component.text = $"Install Host Mods ({num2}) ({num6} {value})";
+			break;
+		}
+		}
+	}
+
+	private void UpdateArrowDisplays()
+	{
+		GameObject gameObject = ((Component)((Component)upArrowButton).transform.parent).gameObject;
+		GameObject gameObject2 = ((Component)((Component)downArrowButton).transform.parent).gameObject;
+		gameObject.SetActive(pageNumber > 0);
+		gameObject2.SetActive(pageNumber < maxPages - 1);
+		if (selectedPanel == Panels.MODIO && modIoRetrieved.Count > 80)
+		{
+			gameObject2.SetActive(true);
+		}
+	}
+
+	private void OnArrowPress(bool up)
+	{
+		if (!up)
+		{
+			pageNumber++;
+		}
+		else
+		{
+			pageNumber--;
+		}
+		if (pageNumber < 0)
+		{
+			pageNumber = 0;
+		}
+		if (selectedPanel == Panels.MODIO && pageNumber == maxPages - 1 && modIoRetrieved.Count > 80)
+		{
+			trendingOffset++;
+			if (searching)
+			{
+				ModFileManager.QueueTrending(trendingOffset * 100, KeyboardManager.typed);
+			}
+			else
+			{
+				ModFileManager.QueueTrending(trendingOffset * 100);
+			}
+		}
+		if (pageNumber > maxPages)
+		{
+			pageNumber = maxPages;
+		}
+		if (selectedPanel == Panels.MULTIPLAYER)
+		{
+			PopulateHostMods(pageNumber);
+		}
+		if (selectedPanel == Panels.FILES)
+		{
+			if (chosenSort == InstalledSort.SUBSCRIBED && cachedSubscribedList != null)
+			{
+				maxPages = (int)Math.Ceiling((double)cachedSubscribedList.Count / (double)maxDisplayPerPage);
+				if (pageNumber > maxPages) pageNumber = maxPages - 1;
+				PopulateFiles(pageNumber, cachedSubscribedList);
+			}
+			else if (chosenSort == InstalledSort.INSTALLED)
+			{
+				maxPages = (int)Math.Ceiling((double)totalInstalled.Count / (double)maxDisplayPerPage);
+				if (pageNumber > maxPages) pageNumber = maxPages - 1;
+				PopulateFiles(pageNumber);
+			}
+			else if (chosenSort == InstalledSort.BLACKLIST)
+			{
+				PopulateBlacklist(pageNumber);
+			}
+		}
+		if (selectedPanel == Panels.MODIO)
+		{
+			PopulateModIoTab(pageNumber);
+		}
+		if (selectedPanel == Panels.SETTINGS)
+		{
+			PopulateSettings(pageNumber);
+		}
+		UpdateArrowDisplays();
+	}
+
+	private void RegisterWholeKeyboard()
+	{
+		RegisterKey("Q");
+		RegisterKey("W");
+		RegisterKey("E");
+		RegisterKey("R");
+		RegisterKey("T");
+		RegisterKey("Y");
+		RegisterKey("U");
+		RegisterKey("I");
+		RegisterKey("O");
+		RegisterKey("P");
+		RegisterKey("A");
+		RegisterKey("S");
+		RegisterKey("D");
+		RegisterKey("F");
+		RegisterKey("G");
+		RegisterKey("H");
+		RegisterKey("J");
+		RegisterKey("K");
+		RegisterKey("L");
+		RegisterKey("Z");
+		RegisterKey("X");
+		RegisterKey("C");
+		RegisterKey("V");
+		RegisterKey("B");
+		RegisterKey("N");
+		RegisterKey("M");
+		RegisterKey("1");
+		RegisterKey("2");
+		RegisterKey("3");
+		RegisterKey("4");
+		RegisterKey("5");
+		RegisterKey("6");
+		RegisterKey("7");
+		RegisterKey("8");
+		RegisterKey("9");
+		RegisterKey("0");
+		RegisterKey(".");
+		RegisterKey(",");
+		RegisterKey("'");
+		RegisterKey("-");
+		RegisterKey("=");
+		SetKeyAction("Backspace", delegate
+		{
+			KeyboardManager.Backspace();
+		});
+		SetKeyAction("Space", delegate
+		{
+			KeyboardManager.Append(" ");
+		});
+		SetKeyAction("Enter", delegate
+		{
+			Search(KeyboardManager.typed);
+		});
+		SetKeyAction("Exit", delegate
+		{
+			rootAnimator.SetTrigger("keyboardpopup");
+			SetMainCanvasColliderState(enabled: true);
+		});
+	}
+
+	public void Reset()
+	{
+		((Component)((Component)this).transform.parent.Find("ModInfoOverlay")).gameObject.SetActive(false);
+		keyboardPopup.gameObject.SetActive(false);
+		((Component)this).GetComponent<CanvasGroup>().interactable = true;
+		SetMainCanvasColliderState(enabled: true);
+	}
+
+	private void RegisterKey(string keyName)
+	{
+		SetKeyAction(keyName, delegate
+		{
+			KeyboardManager.Append(keyName);
+		});
+	}
+
+	private void PopupKeyboard()
+	{
+		rootAnimator.SetTrigger("keyboardpopup");
+		SetMainCanvasColliderState(enabled: false);
+	}
+
+	[HideFromIl2Cpp]
+	private void SetKeyAction(string keyName, Action action)
+	{
+		GameObject gameObject = ((Component)keyboardPopup.transform.Find("Keyboard").Find(keyName)).gameObject;
+		Button component = gameObject.GetComponent<Button>();
+		component.onClick.AddListener(new System.Action(() => action()));
+	}
+
+	private void Update()
+	{
+		List<StalledAction> toRemove = new List<StalledAction>();
+		foreach (StalledAction stalledAction in stalledActions)
+		{
+			stalledAction.frameCount--;
+			if (stalledAction.frameCount == 0)
+			{
+				stalledAction.action();
+				toRemove.Add(stalledAction);
+			}
+		}
+		stalledActions.RemoveAll((StalledAction stall) => toRemove.Contains(stall));
+		if ((UnityEngine.Object)(object)desired != (UnityEngine.Object)null && (UnityEngine.Object)(object)selector != (UnityEngine.Object)null)
+		{
+			selector.position = Vector3.Lerp(selector.position, desired.position, speed * Time.deltaTime);
+		}
+		if (ModFileManager.activeDownloadQueueElement != null)
+		{
+			modProgressDisplay.SetActive(true);
+			RawImage thumbnail = ((Component)modProgressDisplay.transform.Find("Thumbnail")).gameObject.GetComponent<RawImage>();
+			if (lastDownloadedTitle != ModFileManager.activeDownloadQueueElement.info.modName)
+			{
+				lastDownloadedTitle = ModFileManager.activeDownloadQueueElement.info.modName;
+				ThumbnailThreader.DownloadThumbnail(ModFileManager.activeDownloadQueueElement.info.thumbnailLink, delegate(Texture thumb)
+				{
+					thumbnail.texture = thumb;
+				});
+			}
+			TMP_Text component = ((Component)modProgressDisplay.transform.Find("Title")).gameObject.GetComponent<TMP_Text>();
+			component.text = ModFileManager.activeDownloadQueueElement.info.modName;
+			TMP_Text component2 = ((Component)modProgressDisplay.transform.Find("Percentage")).gameObject.GetComponent<TMP_Text>();
+			component2.text = (int)Math.Round(ModlistMenu.activeDownloadModInfo.modDownloadPercentage) + "%";
+		}
+		else
+		{
+			lastDownloadedTitle = "nothing";
+			modProgressDisplay.SetActive(false);
+		}
+		if (multiplayerTabButton != null)
+		{
+			((Component)((Component)multiplayerTabButton).transform.parent).gameObject.SetActive(NetworkInfo.HasServer);
+		}
+		if (keyboardPopup != null)
+		{
+			typeBarText.text = KeyboardManager.typed;
+			if (KeyboardManager.typed == "")
+			{
+				typeBarTextObject.SetActive(false);
+				typeBarEmptyTextObject.SetActive(true);
+			}
+			else
+			{
+				typeBarTextObject.SetActive(true);
+				typeBarEmptyTextObject.SetActive(false);
+			}
+		}
+	}
+
+	public void SetSelectorDesired(Transform transform)
+	{
+		desired = transform;
+	}
 }

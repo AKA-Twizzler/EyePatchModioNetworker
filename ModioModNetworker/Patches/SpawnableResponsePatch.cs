@@ -1,59 +1,42 @@
+using System;
 using HarmonyLib;
 using Il2CppSLZ.Marrow.Warehouse;
 using LabFusion.Marrow;
 using LabFusion.Network;
-using MelonLoader;
-using ModioModNetworker.Data;
 using ModioModNetworker.Queue;
-using ModioModNetworker.Utilities;
 
-namespace ModioModNetworker.Patches
+namespace ModioModNetworker.Patches;
+
+public class SpawnableResponsePatch
 {
-    public class SpawnableResponsePatch 
-    {
-        [HarmonyPatch(typeof(SpawnResponseMessage), "OnHandleMessage", typeof(ReceivedMessage))]
-        public static class PatchClass
-        {
-            public static bool Prefix(ReceivedMessage received)
-            {
-                if (!received.IsServerHandled && MainClass.autoDownloadSpawnables)
-                {
-
-                    SpawnResponseData data = received.ReadData<SpawnResponseData>();
-
-                    if (!MainClass.confirmedHostHasIt && !MainClass.useRepo)
-                    {
-                        return true;
-                    }
-
-                    if (!MainClass.overrideFusionDL)
-                    {
-                        return true;
-                    }
-
-                    if (!CrateFilterer.HasCrate<GameObjectCrate>(new Barcode(data.SpawnData.Barcode)))
-                    {
-
-
-                        SpawnableHoldQueue.AddToQueue(new SpawnableHoldQueueData()
-                        {
-                            missingBarcode = data.SpawnData.Barcode,
-                            _data = data
-                        });
-                        return false;
-                    }
-
-                    if (LevelHoldQueue.LevelInQueue())
-                    {
-                        SpawnableHoldQueue.AddToQueue(data);
-                        return false;
-                    }
-
-                }
-
-
-                return true;
-            }
-        }
-    }
+	[HarmonyPatch(typeof(SpawnResponseMessage), "OnHandleMessage", new Type[] { typeof(ReceivedMessage) })]
+	public static class PatchClass
+	{
+		public static bool Prefix(ReceivedMessage received)
+		{
+			if (!received.IsServerHandled && MainClass.autoDownloadSpawnables)
+			{
+				SpawnResponseData val = received.ReadData<SpawnResponseData>();
+				if (!MainClass.overrideFusionDL)
+				{
+					return true;
+				}
+				if (!CrateFilterer.HasCrate<GameObjectCrate>(new Barcode(val.SpawnData.Barcode)))
+				{
+					SpawnableHoldQueue.AddToQueue(new SpawnableHoldQueueData
+					{
+						missingBarcode = val.SpawnData.Barcode,
+						_data = val
+					});
+					return false;
+				}
+				if (LevelHoldQueue.LevelInQueue())
+				{
+					SpawnableHoldQueue.AddToQueue(val);
+					return false;
+				}
+			}
+			return true;
+		}
+	}
 }

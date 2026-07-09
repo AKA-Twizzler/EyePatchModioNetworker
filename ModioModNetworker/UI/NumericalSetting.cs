@@ -1,88 +1,84 @@
-﻿using ModioModNetworker.Utilities;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Il2CppTMPro;
+using ModioModNetworker.Utilities;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.UI;
 
-namespace ModioModNetworker.UI
+namespace ModioModNetworker.UI;
+
+public class NumericalSetting : GenericSetting
 {
-    public class NumericalSetting : GenericSetting
-    {
-        public NumericalSetting(string title, int startingValue, int minValue, int maxValue, int increment, Action<int> onModified = null)
-        {
-            prefabObject = NetworkerAssets.numericalSettingPrefab;
-            this.title = title;
-            value = startingValue;
-            this.onModified = onModified;
-            this.minValue = minValue;
-            this.maxValue = maxValue;
-            this.increment = increment;
-        }
+	private Button increaseButton;
 
-        Button increaseButton;
-        Button decreaseButton;
-        public int value;
-        public Action<int> onModified;
-        public int minValue;
-        public int maxValue;
-        public int increment;
+	private Button decreaseButton;
 
-        public override void SpawnPrefab(Transform parent) {
-            GameObject spawnedElement = GameObject.Instantiate(prefabObject);
-            increaseButton = spawnedElement.transform.Find("IncreaseArrow").Find("Button").GetComponent<Button>();
-            decreaseButton = spawnedElement.transform.Find("DecreaseArrow").Find("Button").GetComponent<Button>();
+	public int value;
 
-            increaseButton.onClick.AddListener(new Action(() => {
-                ModifyValue(true);
-            }));
+	public Action<int> onModified;
 
-            decreaseButton.onClick.AddListener(new Action(() => {
-                ModifyValue(false);
-            }));
+	public int minValue;
 
-            TMP_Text titleText = spawnedElement.transform.Find("Title").GetComponent<TMP_Text>();
-            titleText.text = title;
+	public int maxValue;
 
-            spawnedElement.transform.parent = parent;
-            spawnedElement.transform.localPosition = Vector3.forward;
-            spawnedElement.transform.localRotation = Quaternion.identity;
-            spawnedElement.transform.localScale = Vector3.one;
+	public int increment;
 
-            spawnedObject = spawnedElement;
-            UpdateDisplay();
-        }
+	public NumericalSetting(string title, int startingValue, int minValue, int maxValue, int increment, Action<int> onModified = null)
+	{
+		prefabObject = NetworkerAssets.numericalSettingPrefab;
+		base.title = title;
+		value = startingValue;
+		this.onModified = onModified;
+		this.minValue = minValue;
+		this.maxValue = maxValue;
+		this.increment = increment;
+	}
 
-        private void ModifyValue(bool increase) {
-            if (increase)
-            {
-                value+=increment;
-            }
-            else {
-                value-=increment;
-            }
+	public override void SpawnPrefab(Transform parent)
+	{
+		GameObject val = UnityEngine.Object.Instantiate<GameObject>(prefabObject);
+		increaseButton = ((Component)val.transform.Find("IncreaseArrow").Find("Button")).GetComponent<Button>();
+		decreaseButton = ((Component)val.transform.Find("DecreaseArrow").Find("Button")).GetComponent<Button>();
+		increaseButton.onClick.AddListener(new System.Action(() => ModifyValue(increase: true)));
+		decreaseButton.onClick.AddListener(new System.Action(() => ModifyValue(increase: false)));
+		TMP_Text component = ((Component)val.transform.Find("Title")).GetComponent<TMP_Text>();
+		component.text = title;
+		val.transform.parent = parent;
+		val.transform.localPosition = Vector3.forward;
+		val.transform.localRotation = Quaternion.identity;
+		val.transform.localScale = Vector3.one;
+		spawnedObject = val;
+		UpdateDisplay();
+	}
 
-            if (value < minValue) {
-                value = minValue;
-            }
+	private void ModifyValue(bool increase)
+	{
+		if (increase)
+		{
+			value += increment;
+		}
+		else
+		{
+			value -= increment;
+		}
+		if (value < minValue)
+		{
+			value = minValue;
+		}
+		if (value > maxValue)
+		{
+			value = maxValue;
+		}
+		UpdateDisplay();
+		if (onModified != null)
+		{
+			onModified(value);
+		}
+	}
 
-            if (value > maxValue) {
-                value = maxValue;
-            }
-
-            UpdateDisplay();
-            if (onModified != null) {
-                onModified.Invoke(value);
-            }
-        }
-
-        private void UpdateDisplay() {
-            TMP_Text numberText = spawnedObject.transform.Find("NumericalDisplay").GetComponent<TMP_Text>();
-
-            numberText.text = value.ToString();
-        }
-    }
+	private void UpdateDisplay()
+	{
+		TMP_Text component = ((Component)spawnedObject.transform.Find("NumericalDisplay")).GetComponent<TMP_Text>();
+		component.text = value.ToString();
+	}
 }

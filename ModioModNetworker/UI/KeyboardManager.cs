@@ -1,21 +1,19 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+namespace ModioModNetworker.UI;
 
-namespace ModioModNetworker.UI
+public class KeyboardManager
 {
-    public class KeyboardManager
-    {
-        public static string typed = "";
+	public static string typed = "";
 
-        public static void Append(string character) {
-            typed += character;
-        }
+	public static void Append(string character)
+	{
+		typed += character;
+	}
 
-        public static void Backspace() {
-            typed = typed.Substring(0, typed.Length - 1);
-        }
-    }
+	public static void Backspace()
+	{
+		if (typed.Length > 0)
+		{
+			typed = typed.Substring(0, typed.Length - 1);
+		}
+	}
 }

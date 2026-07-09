@@ -1,69 +1,67 @@
-﻿using MelonLoader;
-using ModioModNetworker.Data;
-using ModIoModNetworker.Ui;
 using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using ModioModNetworker.UI;
+using ModioModNetworker.Data;
 using UnityEngine;
 using UnityEngine.Networking;
 
-namespace ModioModNetworker.UI
+namespace ModioModNetworker.UI;
+
+public class SpotlightOverride
 {
-    public class SpotlightOverride
-    {
-        public string manualDisplayId;
-        public string descriptionOverride;
-        public string titleOverride;
-        public string subTitle;
-        public ModInfo downloadedInfo;
-        public Texture cachedThumbnail;
+	public string manualDisplayId;
 
-        public static void LoadFromRegularURL()
-        {
-            UnityWebRequest httpWebRequest = UnityWebRequest.Get("https://raw.githubusercontent.com/notnotnotswipez/ModioModNetworker/networker-spotlight/modSpotlight.txt");
-            var requestSent = httpWebRequest.SendWebRequest();
+	public string descriptionOverride;
 
-            requestSent.m_completeCallback += new System.Action<AsyncOperation>((asyncOperation) =>
-            {
-                string repoInformation = httpWebRequest.downloadHandler.text;
+	public string titleOverride;
 
-                string[] lines = repoInformation.Split('\n');
-                foreach (string line in lines)
-                {
-                    if (line.StartsWith("manualDisplayMod: ")) {
-                        NetworkerMenuController.spotlightOverride.manualDisplayId = GetSegmentOrNull(line, "manualDisplayMod: ");
+	public string subTitle;
 
-                        if (NetworkerMenuController.spotlightOverride.manualDisplayId != null) {
-                            ModInfo.RequestModInfoNumerical(NetworkerMenuController.spotlightOverride.manualDisplayId, "spotlight");
-                        }
-                    }
+	public ModInfo downloadedInfo;
 
-                    if (line.StartsWith("subTitle: "))
-                    {
-                        NetworkerMenuController.spotlightOverride.subTitle = GetSegmentOrNull(line, "subTitle: ");
-                    }
-                    if (line.StartsWith("titleOverride: "))
-                    {
-                        NetworkerMenuController.spotlightOverride.titleOverride = GetSegmentOrNull(line, "titleOverride: ");
-                    }
-                    if (line.StartsWith("descriptionOverride: "))
-                    {
-                        NetworkerMenuController.spotlightOverride.descriptionOverride = GetSegmentOrNull(line, "descriptionOverride: ");
-                    }
-                }
-            });
-        }
+	public Texture cachedThumbnail;
 
-        private static string GetSegmentOrNull(string line, string startWith) {
-            string result = line.Replace(startWith, "");
-            if (result != "null") {
-                return result;
-            }
+	public static void LoadFromRegularURL()
+	{
+		UnityWebRequest httpWebRequest = UnityWebRequest.Get("https://raw.githubusercontent.com/notnotnotswipez/ModioModNetworker/networker-spotlight/modSpotlight.txt");
+		UnityWebRequestAsyncOperation val = httpWebRequest.SendWebRequest();
+		((AsyncOperation)val).m_completeCallback = ((AsyncOperation)val).m_completeCallback + new Action<AsyncOperation>(delegate
+		{
+			string text = httpWebRequest.downloadHandler.text;
+			string[] array = text.Split('\n');
+			string[] array2 = array;
+			foreach (string text2 in array2)
+			{
+				if (text2.StartsWith("manualDisplayMod: "))
+				{
+					NetworkerMenuController.spotlightOverride.manualDisplayId = GetSegmentOrNull(text2, "manualDisplayMod: ");
+					if (NetworkerMenuController.spotlightOverride.manualDisplayId != null)
+					{
+						ModInfo.RequestModInfoNumerical(NetworkerMenuController.spotlightOverride.manualDisplayId, "spotlight");
+					}
+				}
+				if (text2.StartsWith("subTitle: "))
+				{
+					NetworkerMenuController.spotlightOverride.subTitle = GetSegmentOrNull(text2, "subTitle: ");
+				}
+				if (text2.StartsWith("titleOverride: "))
+				{
+					NetworkerMenuController.spotlightOverride.titleOverride = GetSegmentOrNull(text2, "titleOverride: ");
+				}
+				if (text2.StartsWith("descriptionOverride: "))
+				{
+					NetworkerMenuController.spotlightOverride.descriptionOverride = GetSegmentOrNull(text2, "descriptionOverride: ");
+				}
+			}
+		});
+	}
 
-            return null;
-        }
-    }
+	private static string GetSegmentOrNull(string line, string startWith)
+	{
+		string text = line.Replace(startWith, "");
+		if (text != "null")
+		{
+			return text;
+		}
+		return null;
+	}
 }

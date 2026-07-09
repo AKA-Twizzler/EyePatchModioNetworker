@@ -1,76 +1,82 @@
-﻿using MelonLoader;
+using System;
+using Il2CppInterop.Runtime.Attributes;
+using Il2CppTMPro;
+using MelonLoader;
 using ModioModNetworker.Data;
 using ModioModNetworker.UI;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Il2CppTMPro;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.UI;
 
-namespace ModIoModNetworker.Ui
+namespace ModioModNetworker.UI;
+
+[RegisterTypeInIl2Cpp]
+public class ModInfoDisplay : MonoBehaviour
 {
-    [RegisterTypeInIl2Cpp]
-    public class ModInfoDisplay : MonoBehaviour
-    {
+	public ModInfoDisplay(IntPtr intPtr) : base(intPtr) { }
+	public TMP_Text title;
 
-        public ModInfoDisplay(IntPtr intPtr) : base(intPtr)
-        {
-        }
+	private RawImage thumbnailImage;
 
-        public TMP_Text title;
-        private RawImage thumbnailImage;
-        public RawImage borderImage;
-        public ModInfo modInfo;
-        public Button button;
-        public NetworkerMenuController controller;
-        public GameObject subscriptionButton;
+	public RawImage borderImage;
 
-        private bool hasAddedThumbnail = false;
+	public ModInfo modInfo;
 
+	public Button button;
 
-        public void Awake() {
-            thumbnailImage = transform.Find("Thumbnail").GetComponent<RawImage>();
-            title = transform.Find("Text (TMP)").GetComponent<TMP_Text>();
-            borderImage = transform.Find("BaseOverlay").GetComponent<RawImage>();
-            button = transform.Find("Button").GetComponent<Button>();
-            subscriptionButton = transform.Find("SubscribedIndicator").gameObject;
-            button.onClick.AddListener(new Action(() =>
-            {
-                OnModInfoPressed();
-            }));
-        }
+	public NetworkerMenuController controller;
 
-        public void OnModInfoPressed() {
-            controller.TriggerModInfoPopup(true, modInfo);
-        }
+	public GameObject subscriptionButton;
 
-        public void SetModInfo(ModInfo modInfo) {
+	private bool hasAddedThumbnail = false;
 
-            this.modInfo = modInfo;
-            title.text = modInfo.modName;
-            if (!modInfo.IsSubscribed())
-            {
-                subscriptionButton.SetActive(false);
-            }
-            else {
-                subscriptionButton.SetActive(true);
-            }
-            ThumbnailThreader.DownloadThumbnail(modInfo.thumbnailLink, (texture =>
-            {
-                if (thumbnailImage) {
-                    thumbnailImage.texture = texture;
-                    hasAddedThumbnail = true;
-                }
-            }));
-        }
+	public void Awake()
+	{
+		thumbnailImage = ((Component)((Component)this).transform.Find("Thumbnail")).GetComponent<RawImage>();
+		title = ((Component)((Component)this).transform.Find("Text (TMP)")).GetComponent<TMP_Text>();
+		borderImage = ((Component)((Component)this).transform.Find("BaseOverlay")).GetComponent<RawImage>();
+		button = ((Component)((Component)this).transform.Find("Button")).GetComponent<Button>();
+		subscriptionButton = ((Component)((Component)this).transform.Find("SubscribedIndicator")).gameObject;
+		button.onClick.AddListener(new System.Action(() => OnModInfoPressed()));
+	}
 
-        public void DestroyThumbnail() {
-            if (hasAddedThumbnail) {
-                DestroyImmediate(thumbnailImage.texture);
-            }
-        }
-    }
+	public void OnModInfoPressed()
+	{
+		controller.TriggerModInfoPopup(show: true, modInfo);
+	}
+
+	[HideFromIl2Cpp]
+	public void SetModInfo(ModInfo modInfo)
+	{
+		this.modInfo = modInfo;
+		if (modInfo == null || modInfo.modName == null)
+		{
+			MelonLogger.Error($"[Diag] SetModInfo: modInfo or modName is NULL! modId={modInfo?.modId ?? "null"}");
+		}
+		title.text = modInfo?.modName ?? modInfo?.modId ?? "Unknown";
+		if (modInfo == null || !modInfo.IsSubscribed())
+		{
+			subscriptionButton.SetActive(false);
+		}
+		else
+		{
+			subscriptionButton.SetActive(true);
+		}
+		ThumbnailThreader.DownloadThumbnail(modInfo?.thumbnailLink, delegate(Texture texture)
+		{
+			if (thumbnailImage != null)
+			{
+				thumbnailImage.texture = texture;
+				hasAddedThumbnail = true;
+			}
+		});
+	}
+
+	public void DestroyThumbnail()
+	{
+		if (hasAddedThumbnail)
+		{
+			UnityEngine.Object.DestroyImmediate((UnityEngine.Object)(object)thumbnailImage.texture);
+		}
+	}
 }

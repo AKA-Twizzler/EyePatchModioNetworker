@@ -1,45 +1,33 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UnityEngine.Networking;
 using UnityEngine;
-using System.Collections.Concurrent;
-using Il2CppTMPro;
 
-namespace ThunderstoreModAssistant.Utilities
+namespace ModioModNetworker.Utilities;
+
+public class TimerManager
 {
-    public class TimerManager
-    {
-        private static List<TimerDelayedAction> timerDelayedJobs = new List<TimerDelayedAction>();
+	private static List<TimerDelayedAction> timerDelayedJobs = new List<TimerDelayedAction>();
 
-        public static void Update()
-        {
-            foreach (var delayedAction in timerDelayedJobs) {
-                delayedAction.time -= Time.deltaTime;
-                if (delayedAction.time <= 0) {
-                    delayedAction.onTimeOver.Invoke();
-                    delayedAction.completed = true;
-                }
-            }
+	public static void Update()
+	{
+		foreach (TimerDelayedAction timerDelayedJob in timerDelayedJobs)
+		{
+			timerDelayedJob.time -= Time.deltaTime;
+			if (timerDelayedJob.time <= 0f)
+			{
+				timerDelayedJob.onTimeOver();
+				timerDelayedJob.completed = true;
+			}
+		}
+		timerDelayedJobs.RemoveAll((TimerDelayedAction x) => x.completed);
+	}
 
-            timerDelayedJobs.RemoveAll(x => x.completed);
-        }
-
-        public static void DelayAction(float time, Action onCompleted)
-        {
-            timerDelayedJobs.Add(new TimerDelayedAction()
-            {
-                time = time,
-                onTimeOver = onCompleted
-            });
-        }
-    }
-
-    public class TimerDelayedAction {
-        public float time;
-        public Action onTimeOver;
-        public bool completed = false;
-    }
+	public static void DelayAction(float time, Action onCompleted)
+	{
+		timerDelayedJobs.Add(new TimerDelayedAction
+		{
+			time = time,
+			onTimeOver = onCompleted
+		});
+	}
 }

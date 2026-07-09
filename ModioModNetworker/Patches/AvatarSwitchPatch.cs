@@ -1,91 +1,68 @@
+using System;
 using HarmonyLib;
+using Il2CppSLZ.Marrow;
+using Il2CppSLZ.Marrow.Warehouse;
 using LabFusion.Data;
 using LabFusion.Network;
-using LabFusion.Representation;
-using LabFusion.Senders;
-using MelonLoader;
-using ModioModNetworker.Data;
-using Il2CppSLZ.Marrow.SceneStreaming;
-using Il2CppSLZ.Marrow.Warehouse;
-using LabFusion.Player;
 using LabFusion.Network.Serialization;
+using LabFusion.Player;
+using LabFusion.Senders;
+using ModInfo = ModioModNetworker.Data.ModInfo;
+using ModioModNetworker.Data;
 
-namespace ModioModNetworker.Patches
+namespace ModioModNetworker.Patches;
+
+public class AvatarSwitchPatch
 {
-    public class AvatarSwitchPatch
-    {
-        // TODO: REPO DOWN
-        /*[HarmonyPatch(typeof(PlayerRep), "OnSwapAvatar")]
-        public class OnRepSwapAvatarPatch {
-            public static void Postfix(PlayerRep __instance, bool success) {
-                if (!success && MainClass.useRepo && MainClass.autoDownloadAvatars)
-                {
-                    
-                    string name;
-                    __instance.PlayerId.TryGetDisplayName(out name);
-                    string avatarBarcode = __instance.avatarId;
-                    string palletBarcode = RepoManager.GetPalletBarcodeFromCrateBarcode(avatarBarcode);
-                    RepoModInfo repoModInfo = RepoManager.GetRepoModInfoFromPalletBarcode(palletBarcode);
-
-                    if (repoModInfo != null)
-                    {
-                        string existingNumericalId = repoModInfo.modNumericalId;
-                        if (existingNumericalId != null)
-                        {
-                            ModInfo.RequestModInfoNumerical(existingNumericalId, "install_avatar;" + __instance.PlayerId.SmallId);
-                        }
-                    }
-                    else {
-                        
-        .Error("We DO NOT have any repo information on: " + palletBarcode);
-                    }
-                }
-            }
-        }*/
-
-
-        [HarmonyPatch(typeof(PlayerSender), "SendPlayerAvatar")]
-        public static class PlayerSenderPatch
-        {
-            public static void Postfix()
-            {
-                if (NetworkInfo.HasServer && MainClass.confirmedHostHasIt)
-                {
-                    Data.ModInfo avatarModInfo = null;
-                    foreach (var installedModInfo in MainClass.InstalledModInfos)
-                    {
-                        if (installedModInfo.palletBarcode == RigData.Refs.RigManager._avatarCrate.Crate._pallet._barcode._id)
-                        {
-                            avatarModInfo = installedModInfo.ModInfo;
-                            break;
-                        }
-                    }
-
-                    if (!ModlistMessage.avatarMods.ContainsKey(PlayerIDManager.LocalID))
-                    {
-                        ModlistMessage.avatarMods.Add(PlayerIDManager.LocalID, avatarModInfo);
-                    }
-                    else
-                    {
-                        ModlistMessage.avatarMods[PlayerIDManager.LocalID] = avatarModInfo;
-                    }
-
-
-                    if (avatarModInfo != null)
-                    {
-                        using (var writer = NetWriter.Create())
-                        {
-                            var data = ModlistData.Create(PlayerIDManager.LocalID, avatarModInfo, ModlistData.ModType.AVATAR);
-                            data.Serialize(writer);
-                            using (var message = NetMessage.ModuleCreate<ModlistMessage>(writer, CommonMessageRoutes.ReliableToClients))
-                            {
-                                MessageSender.BroadcastMessageExceptSelf(NetworkChannel.Reliable, message);
-                            }
-
-                        }
-                    }
-                }
-            }
-        }
-    }
+	[HarmonyPatch(typeof(PlayerSender), "SendPlayerAvatar")]
+	public static class PlayerSenderPatch
+	{
+		public static void Postfix()
+		{
+			if (!NetworkInfo.HasServer || !MainClass.confirmedHostHasIt)
+			{
+				return;
+			}
+			ModInfo modInfo = null;
+			foreach (InstalledModInfo installedModInfo in MainClass.InstalledModInfos)
+			{
+				if (installedModInfo.palletBarcode == ((Scannable)((Crate)((CrateReferenceT<AvatarCrate>)(object)RigData.Refs.RigManager._avatarCrate).Crate)._pallet)._barcode._id)
+				{
+					modInfo = installedModInfo.ModInfo;
+					break;
+				}
+			}
+			if (!ModlistMessage.avatarMods.ContainsKey(PlayerIDManager.LocalID))
+			{
+				ModlistMessage.avatarMods.Add(PlayerIDManager.LocalID, modInfo);
+			}
+			else
+			{
+				ModlistMessage.avatarMods[PlayerIDManager.LocalID] = modInfo;
+			}
+			if (modInfo == null)
+			{
+				return;
+			}
+			NetWriter val = NetWriter.Create();
+			try
+			{
+				ModlistData modlistData = ModlistData.Create(PlayerIDManager.LocalID, modInfo, ModlistData.ModType.AVATAR);
+				modlistData.Serialize((INetSerializer)(object)val);
+				NetMessage val2 = NetMessage.ModuleCreate<ModlistMessage>(val, CommonMessageRoutes.ReliableToClients, (byte?)null);
+				try
+				{
+					MessageSender.BroadcastMessageExceptSelf((NetworkChannel)0, val2);
+				}
+				finally
+				{
+					((IDisposable)val2)?.Dispose();
+				}
+			}
+			finally
+			{
+				((IDisposable)val)?.Dispose();
+			}
+		}
+	}
 }
