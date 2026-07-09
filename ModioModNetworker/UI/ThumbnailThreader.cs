@@ -61,16 +61,28 @@ public class ThumbnailThreader
 						MelonLoader.MelonLogger.Error("[Diag] DownloadThumbnail: Failed to parse CDN URL as URI");
 					}
 
-					// Build URL fallback chain: original → HTTP CDN → HTTPS alt CDN → HTTP alt CDN
-					List<string> urlsToTry = new List<string> { url };
-					if (path != null)
-					{
-						urlsToTry.Add($"http://thumb.modcdn.io{path}");
-						urlsToTry.Add($"https://thumb.modapi.io{path}");
-						urlsToTry.Add($"http://thumb.modapi.io{path}");
-					}
+				// Build URL fallback chain: original → HTTP original → alt CDNs → API fallback
+				List<string> urlsToTry = new List<string>();
 
-					using (var cdnClient = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(15) })
+				// 1. Original CDN URL (with 45s timeout)
+				urlsToTry.Add(url);
+
+				// 2. HTTP version of original URL (https → http)
+				if (url.StartsWith("https://"))
+				{
+					urlsToTry.Add("http://" + url.Substring(8));
+				}
+
+				// 3. Alternative CDN hostnames using same path
+				if (path != null)
+				{
+					urlsToTry.Add($"https://thumb.modcdn.io{path}");
+					urlsToTry.Add($"http://thumb.modcdn.io{path}");
+					urlsToTry.Add($"https://thumb.modapi.io{path}");
+					urlsToTry.Add($"http://thumb.modapi.io{path}");
+				}
+
+					using (var cdnClient = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(45) })
 					{
 						cdnClient.DefaultRequestHeaders.UserAgent.ParseAdd("ModioModNetworker/2.8.49");
 

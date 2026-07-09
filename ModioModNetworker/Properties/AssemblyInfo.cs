@@ -6,7 +6,7 @@ using System.Runtime.Versioning;
 using MelonLoader;
 using ModioModNetworker;
 
-[assembly: MelonInfo(typeof(MainClass), "ModioModNetworker", "2.8.49", "notnotnotswipez", null)]
+[assembly: MelonInfo(typeof(MainClass), "ModioModNetworker", "2.8.50", "notnotnotswipez", null)]
 [assembly: AssemblyTitle("ModioModNetworker")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
@@ -16,5 +16,5 @@ using ModioModNetworker;
 [assembly: AssemblyTrademark("")]
 [assembly: ComVisible(false)]
 [assembly: Guid("cdde6516-f286-4f2c-ad4b-d75164eb3e75")]
-[assembly: AssemblyFileVersion("2.8.49.0")]
-[assembly: AssemblyVersion("2.8.49.0")]
+[assembly: AssemblyFileVersion("2.8.50.0")]
+[assembly: AssemblyVersion("2.8.50.0")]

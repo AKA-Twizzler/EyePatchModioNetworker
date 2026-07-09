@@ -501,7 +501,7 @@ public class MainClass : MelonMod
 					});
 				}
 			}
-			ModlistMessage.waitAndQueue.Clear();
+			ModlistMessage.waitAndQueue?.Clear();
 		}
 		if (subsChanged)
 		{
@@ -590,18 +590,18 @@ public class MainClass : MelonMod
 				NetworkerMenuController.instance.UpdateModPopupButtons();
 			}
 		}
-		// Process trending FIRST
-		if (trendingThreadString != "")
-		{
-			InternalPopulateTrending();
-			NetworkerMenuController.instance.OnNewTrendingRecieved();
-		}
-		// Process subscriptions SECOND
+		// Process subscriptions FIRST
 		if (subscriptionThreadString != "" && !_processingSubscriptionData)
 		{
 			_processingSubscriptionData = true;
 			try { InternalPopulateSubscriptions(); }
 			finally { _processingSubscriptionData = false; }
+		}
+		// Process trending SECOND
+		if (trendingThreadString != "")
+		{
+			InternalPopulateTrending();
+			NetworkerMenuController.instance.OnNewTrendingRecieved();
 		}
 	}
 
@@ -1076,8 +1076,6 @@ public class MainClass : MelonMod
                     modInfo.isValidMod = true;
                 }
                 ReceiveSubModInfo(modInfo);
-                NetworkerMenuController.modIoRetrieved.Add(modInfo);
-                MelonLogger.Msg("DIAG: Added mod to modIoRetrieved — id=" + modInfo.numericalId + ", name=" + modInfo.modName);
             }
             catch (Exception ex)
             {
