@@ -11,6 +11,7 @@ using ModioModNetworker.Utilities;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
+using Il2CppInterop.Runtime.Attributes;
 
 namespace ModioModNetworker.UI;
 
@@ -214,6 +215,7 @@ public class NetworkerMenuController : MonoBehaviour
 		}
 	}
 
+	[HideFromIl2Cpp]
 	public static void SetHostSubscribedMods(List<ModInfo> modInfos)
 	{
 		host.Clear();
@@ -357,6 +359,7 @@ public class NetworkerMenuController : MonoBehaviour
 		maxPages = 0;
 	}
 
+	[HideFromIl2Cpp]
 	public void TriggerModInfoPopup(bool show, ModInfo modInfo)
 	{
 		rootAnimator = ((Component)this).GetComponentInParent<Animator>();
@@ -708,6 +711,7 @@ public class NetworkerMenuController : MonoBehaviour
 		}
 	}
 
+	[HideFromIl2Cpp]
 	private GameObject MakeModInfoObject(Transform parent, ModInfo modInfo, bool zeroPosition = true)
 	{
 		//IL_0063: Unknown result type (might be due to invalid IL or missing references)
@@ -1044,6 +1048,7 @@ public class NetworkerMenuController : MonoBehaviour
 		SetMainCanvasColliderState(enabled: false);
 	}
 
+	[HideFromIl2Cpp]
 	private void SetKeyAction(string keyName, Action action)
 	{
 		GameObject gameObject = ((Component)keyboardPopup.transform.Find("Keyboard").Find(keyName)).gameObject;

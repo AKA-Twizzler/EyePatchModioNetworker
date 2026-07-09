@@ -13,10 +13,10 @@
     <RootNamespace />
   </PropertyGroup>
   <ItemGroup>
-    <None Remove="ModioModNetworker.Resources.networkermenu.android.networker" />
-    <None Remove="ModioModNetworker.Resources.networkermenu.networker" />
-    <EmbeddedResource Include="ModioModNetworker.Resources.networkermenu.android.networker" LogicalName="ModioModNetworker.Resources.networkermenu.android.networker" />
-    <EmbeddedResource Include="ModioModNetworker.Resources.networkermenu.networker" LogicalName="ModioModNetworker.Resources.networkermenu.networker" />
+    <None Remove="Resources\networkermenu.android.networker" />
+    <None Remove="Resources\networkermenu.networker" />
+    <EmbeddedResource Include="Resources\networkermenu.android.networker" LogicalName="ModioModNetworker.Resources.networkermenu.android.networker" />
+    <EmbeddedResource Include="Resources\networkermenu.networker" LogicalName="ModioModNetworker.Resources.networkermenu.networker" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="MelonLoader" HintPath="/mnt/d/SteamLibrary/steamapps/common/BONELAB/MelonLoader/net6/MelonLoader.dll" />

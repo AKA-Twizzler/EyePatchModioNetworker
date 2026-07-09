@@ -6,6 +6,7 @@ using ModioModNetworker.UI;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
+using Il2CppInterop.Runtime.Attributes;
 
 namespace ModioModNetworker.UI;
 
@@ -44,6 +45,7 @@ public class ModInfoDisplay : MonoBehaviour
 		controller.TriggerModInfoPopup(show: true, modInfo);
 	}
 
+	[HideFromIl2Cpp]
 	public void SetModInfo(ModInfo modInfo)
 	{
 		this.modInfo = modInfo;

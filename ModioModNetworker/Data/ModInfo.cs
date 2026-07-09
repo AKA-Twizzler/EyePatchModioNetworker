@@ -6,7 +6,7 @@ using BoneLib;
 using Il2CppSLZ.Marrow.Forklift.Model;
 using LabFusion.Player;
 using MelonLoader;
-using ModIoModNetworker.Ui;
+using ModioModNetworker.UI;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEngine;

@@ -1,5 +1,5 @@
 using System;
-using ModIoModNetworker.Ui;
+using ModioModNetworker.UI;
 using ModioModNetworker.Data;
 using UnityEngine;
 using UnityEngine.Networking;

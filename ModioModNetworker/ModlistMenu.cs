@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using BoneLib.BoneMenu;
 using BoneLib.BoneMenu.UI;
 using HarmonyLib;
-using ModIoModNetworker.Ui;
+using ModioModNetworker.UI;
 using ModioModNetworker.Data;
 using ModioModNetworker.Utilities;
 using UnityEngine;
@@ -21,7 +21,7 @@ public class ModlistMenu
 			//IL_0088: Unknown result type (might be due to invalid IL or missing references)
 			if (page == mainCategory)
 			{
-				if (!customMenuObject != null)
+				if (customMenuObject == null)
 				{
 					GameObject val = UnityEngine.Object.Instantiate<GameObject>(NetworkerAssets.uiMenuPrefab);
 					((Component)val.transform.Find("MenuBase")).gameObject.AddComponent<NetworkerMenuController>();

@@ -12,7 +12,7 @@ using Il2CppSLZ.Marrow.Pool;
 using Il2CppSLZ.Marrow.SceneStreaming;
 using Il2CppSLZ.Marrow.Warehouse;
 using MelonLoader;
-using ModIoModNetworker.Ui;
+using ModioModNetworker.UI;
 using ModioModNetworker.Data;
 using ModioModNetworker.UI;
 using Newtonsoft.Json;

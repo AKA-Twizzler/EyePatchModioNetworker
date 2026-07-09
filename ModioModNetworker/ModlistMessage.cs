@@ -4,7 +4,7 @@ using Il2CppSLZ.Marrow.SceneStreaming;
 using LabFusion.Network;
 using LabFusion.Player;
 using LabFusion.SDK.Modules;
-using ModIoModNetworker.Ui;
+using ModioModNetworker.UI;
 using ModioModNetworker.Data;
 
 namespace ModioModNetworker;

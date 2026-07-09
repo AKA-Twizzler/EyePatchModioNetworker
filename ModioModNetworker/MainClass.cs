@@ -20,13 +20,13 @@ using LabFusion.UI.Popups;
 using LabFusion.Utilities;
 using MelonLoader;
 using MelonLoader.Preferences;
-using ModIoModNetworker.Ui;
+using ModioModNetworker.UI;
 using ModioModNetworker.Data;
 using ModioModNetworker.Queue;
 using ModioModNetworker.UI;
 using ModioModNetworker.Utilities;
 using Newtonsoft.Json;
-using ThunderstoreModAssistant.Utilities;
+
 using UnityEngine;
 using UnityEngine.AddressableAssets.ResourceLocators;
 
@@ -165,7 +165,14 @@ public class MainClass : MelonMod
 		ModFileManager.MOD_FOLDER_PATH = modsDirectory.Value;
 		SpotlightOverride.LoadFromRegularURL();
 		AssetBundle bundle = (HelperMethods.IsAndroid() ? HelperMethods.LoadEmbeddedAssetBundle(Assembly.GetExecutingAssembly(), "ModioModNetworker.Resources.networkermenu.android.networker") : HelperMethods.LoadEmbeddedAssetBundle(Assembly.GetExecutingAssembly(), "ModioModNetworker.Resources.networkermenu.networker"));
-		NetworkerAssets.LoadAssetsUI(bundle);
+		if (bundle != null)
+		{
+			NetworkerAssets.LoadAssetsUI(bundle);
+		}
+		else
+		{
+			MelonLogger.Error("Failed to load UI asset bundle - modio menu will be unavailable");
+		}
 		PrepareModFiles();
 		string text = ReadAuthKey();
 		blacklistedModIoIds = ReadBlacklist();
