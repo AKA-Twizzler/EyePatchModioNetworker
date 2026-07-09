@@ -86,6 +86,7 @@ public class ThumbnailThreader
 					{
 						cdnClient.DefaultRequestHeaders.UserAgent.ParseAdd("ModioModNetworker/2.8.49");
 
+						bool cdnSucceeded = false;
 						foreach (string tryUrl in urlsToTry)
 						{
 							try
@@ -93,8 +94,9 @@ public class ThumbnailThreader
 								byte[] imageBytes = await cdnClient.GetByteArrayAsync(tryUrl);
 								if (imageBytes != null && imageBytes.Length > 100)
 								{
-									CreateTexture(imageBytes, action);
-									return;
+									cdnSucceeded = AttemptCreateTexture(imageBytes, action);
+									if (cdnSucceeded)
+										return;
 								}
 							}
 							catch (Exception ex)
@@ -120,7 +122,7 @@ public class ThumbnailThreader
 						})
 						using (var apiClient = new System.Net.Http.HttpClient(handler)
 						{
-							Timeout = TimeSpan.FromSeconds(10)
+							Timeout = TimeSpan.FromSeconds(30)
 						})
 						{
 							apiClient.DefaultRequestHeaders.UserAgent.ParseAdd("ModioModNetworker/2.8.17");
@@ -148,7 +150,7 @@ public class ThumbnailThreader
 										byte[] imageBytes = await apiClient.GetByteArrayAsync(logoUrl);
 										if (imageBytes.Length > 1000)
 										{
-											CreateTexture(imageBytes, action);
+											AttemptCreateTexture(imageBytes, action);
 											return;
 										}
 									}
@@ -171,26 +173,26 @@ public class ThumbnailThreader
 		});
 	}
 
-	private static void CreateTexture(byte[] imageBytes, Action<Texture> action)
+	private static bool AttemptCreateTexture(byte[] imageBytes, Action<Texture> action)
 	{
-		MainThreadManager.QueueAction(delegate
+		try
 		{
-			try
+			Texture2D texture = new Texture2D(2, 2);
+			if (UnityEngine.ImageConversion.LoadImage(texture, imageBytes))
 			{
-				Texture2D texture = new Texture2D(2, 2);
-				if (UnityEngine.ImageConversion.LoadImage(texture, imageBytes))
-				{
-					action(texture);
-				}
-				else
-				{
-					MelonLoader.MelonLogger.Error("[Diag] DownloadThumbnail: ImageConversion.LoadImage returned false");
-				}
+				action(texture);
+				return true;
 			}
-			catch (Exception ex)
+			else
 			{
-				MelonLoader.MelonLogger.Error($"[Diag] DownloadThumbnail: Texture creation failed: {ex.Message}");
+				MelonLoader.MelonLogger.Error("[Diag] DownloadThumbnail: ImageConversion.LoadImage returned false");
+				return false;
 			}
-		});
+		}
+		catch (Exception ex)
+		{
+			MelonLoader.MelonLogger.Error($"[Diag] CreateTexture failed: {ex.Message}");
+			return false;
+		}
 	}
 }

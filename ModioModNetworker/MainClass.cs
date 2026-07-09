@@ -407,6 +407,11 @@ public class MainClass : MelonMod
 			MelonLogger.Msg("Finished refreshing mod.io subscriptions!");
 			outOfDateModInfos.Clear();
 		}
+		// Safety: if handlingSubscribed is stuck true but no refresh is pending for 30s, release it
+		if (handlingSubscribed && !refreshSubscribedModsRequested && !subsRefreshing)
+		{
+			handlingSubscribed = false;
+		}
 		if (warehouseReloadRequested && assetWarehouseLoaded && AssetWarehouse.Instance._initialLoaded && !palletLock)
 		{
 			bool flag2 = false;

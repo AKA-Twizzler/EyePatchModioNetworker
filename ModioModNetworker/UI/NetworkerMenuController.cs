@@ -592,20 +592,17 @@ public class NetworkerMenuController : MonoBehaviour
 
 	public void OnNewTrendingRecieved()
 	{
-		if (selectedPanel == Panels.MODIO)
+		if (maxPages >= 1)
 		{
-			if (maxPages >= 1)
-			{
-				PopulateModIoTab(maxPages - 1);
-			}
-			else
-			{
-				PopulateModIoTab(0);
-			}
-			maxPages = (int)Math.Ceiling((double)modIoRetrieved.Count / (double)maxDisplayPerPage);
-			UpdateArrowDisplays();
-			SetMainCanvasColliderState(enabled: true);
+			PopulateModIoTab(maxPages - 1);
 		}
+		else
+		{
+			PopulateModIoTab(0);
+		}
+		maxPages = (int)Math.Ceiling((double)modIoRetrieved.Count / (double)maxDisplayPerPage);
+		UpdateArrowDisplays();
+		SetMainCanvasColliderState(enabled: true);
 	}
 
 	private void PopulateModIoTab(int page)
