@@ -8,6 +8,7 @@ using BoneLib;
 using BoneLib.BoneMenu;
 using Il2CppSLZ.Marrow;
 using Il2CppSLZ.Marrow.SceneStreaming;
+using Il2CppSLZ.Marrow.Forklift.Model;
 using Il2CppSLZ.Marrow.Warehouse;
 using LabFusion.Downloading.ModIO;
 using LabFusion.Entities;
@@ -940,9 +941,188 @@ public class MainClass : MelonMod
 			catch (Exception ex)
 			{
 				MelonLogger.Error("PopulateInstalledMods: Failed to parse manifest " + text + ": " + ex.Message);
+
+				// === OPTION B: Manifest Enrichment from modinfo.json ===
+				// PC manifests lack objects["2"]. Rebuild the mod listing from modinfo.json
+				// which was written when the mod was downloaded through the Networker.
+
+				MelonLogger.Msg("[ManifestEnrichment] Manifest " + Path.GetFileName(text) + " has no objects[\"2\"] — attempting enrichment from modinfo.json");
+
+				string manifestFilePath = text;
+				string modFolderPath = manifestFilePath.EndsWith(".manifest")
+					? manifestFilePath.Substring(0, manifestFilePath.Length - ".manifest".Length)
+					: "";
+
+				try
+				{
+					string barcode = "";
+					if (val != null && val["objects"] != null && val["objects"]["1"] != null)
+					{
+						barcode = (string)val["objects"]["1"]["palletBarcode"];
+					}
+
+					if (string.IsNullOrEmpty(modFolderPath) || !Directory.Exists(modFolderPath))
+					{
+						MelonLogger.Warning("[ManifestEnrichment] Mod folder not found at " + modFolderPath + " — cannot enrich " + Path.GetFileName(text));
+					}
+					else
+					{
+						string modInfoPath = System.IO.Path.Combine(modFolderPath, "modinfo.json");
+						if (!File.Exists(modInfoPath))
+						{
+							MelonLogger.Warning("[ManifestEnrichment] No modinfo.json found at " + modInfoPath + " — cannot enrich " + (barcode ?? Path.GetFileName(text)) + " (mod may have been installed manually, not through Networker)");
+						}
+						else
+						{
+							MelonLogger.Msg("[ManifestEnrichment] Found modinfo.json at " + modInfoPath + " — attempting enrichment for " + (barcode ?? Path.GetFileName(text)));
+
+							string modInfoJson = File.ReadAllText(modInfoPath);
+							ModInfo modInfoFromFile = JsonConvert.DeserializeObject<ModInfo>(modInfoJson, new JsonSerializerSettings
+							{
+								MissingMemberHandling = MissingMemberHandling.Ignore,
+								Error = (sender, args) => args.ErrorContext.Handled = true
+							});
+
+							if (modInfoFromFile == null)
+							{
+								MelonLogger.Warning("[ManifestEnrichment] Failed to deserialize modinfo.json for " + (barcode ?? Path.GetFileName(text)));
+							}
+							else
+							{
+								MelonLogger.Msg("[ManifestEnrichment] Loaded modinfo.json: modName=" + (modInfoFromFile.modName ?? "null") + " numericalId=" + (modInfoFromFile.numericalId ?? "null"));
+
+								if (string.IsNullOrEmpty(modInfoFromFile.numericalId))
+								{
+									MelonLogger.Warning("[ManifestEnrichment] numericalId is missing from modinfo.json for " + (modInfoFromFile.modName ?? "unknown") + " — cannot create ModIOModTarget");
+								}
+								else
+								{
+									// Build a rich ModListing from modinfo.json data
+									ModListing richModListing = modInfoFromFile.ToModListing();
+									MelonLogger.Msg("[ManifestEnrichment] ToModListing() completed for " + (modInfoFromFile.modName ?? barcode) + " — ModListing has targets count: " + ((richModListing?.Targets?.Count ?? 0).ToString()));
+
+									if (!string.IsNullOrEmpty(barcode) && AssetWarehouse.Instance != null &&
+										AssetWarehouse.Instance.palletManifests != null &&
+										AssetWarehouse.Instance.palletManifests.ContainsKey(new Barcode(barcode)))
+									{
+										PalletManifest existingManifest = AssetWarehouse.Instance.palletManifests[new Barcode(barcode)];
+										if (existingManifest != null && existingManifest.Pallet != null)
+										{
+											MelonLogger.Msg("[ManifestEnrichment] Calling LoadAndUpdatePalletManifest for " + barcode + " (pallet=" + (existingManifest.Pallet.name ?? "null") + ")");
+
+											try
+											{
+												AssetWarehouse.Instance.LoadAndUpdatePalletManifest(
+													existingManifest.Pallet,
+													richModListing,
+													existingManifest.PalletPath,
+													existingManifest.CatalogPath,
+													(IResourceLocator)null
+												);
+												MelonLogger.Msg("[ManifestEnrichment] ✅ Successfully enriched manifest for " + (modInfoFromFile.modName ?? barcode) + " — objects[\"2\"] now present in .manifest file");
+
+												// Now re-read the enriched manifest to extract display data
+												if (File.Exists(manifestFilePath))
+												{
+													string enrichedManifestJson = File.ReadAllText(manifestFilePath);
+													dynamic enrichedVal = Newtonsoft.Json.JsonConvert.DeserializeObject<object>(enrichedManifestJson);
+
+													if (enrichedVal["objects"] != null && enrichedVal["objects"]["2"] != null)
+													{
+														try
+														{
+															string enrichedVersion = (string)enrichedVal["objects"]["2"]["version"] ?? "0.0.0";
+															string enrichedModId = (string)enrichedVal["objects"]["2"]["title"] ?? modInfoFromFile.modId ?? "unknown";
+															string enrichedSummary = (string)enrichedVal["objects"]["2"]["description"] ?? "";
+															string enrichedThumbnail = (string)enrichedVal["objects"]["2"]["thumbnailUrl"] ?? "";
+
+															// Extract target data for download links
+															string enrichedWindowsLink = "";
+															string enrichedAndroidLink = "";
+															int enrichedRefPc = -1;
+															int enrichedRefAndroid = -1;
+
+															try { enrichedRefPc = (int)enrichedVal["objects"]["2"]["targets"]["pc"]["ref"]; } catch { }
+															try { enrichedRefAndroid = (int)enrichedVal["objects"]["2"]["targets"]["android"]["ref"]; } catch { }
+
+															int enrichedModIdNum = 0;
+															if (enrichedRefPc != -1 && enrichedVal["objects"][enrichedRefPc.ToString()] != null)
+															{
+																enrichedModIdNum = (int)enrichedVal["objects"][enrichedRefPc.ToString()]["modId"];
+																int fileId = (int)enrichedVal["objects"][enrichedRefPc.ToString()]["modfileId"];
+																enrichedWindowsLink = $"https://g-3809.modapi.io/v1/games/3809/mods/{enrichedModIdNum}/files/{fileId}/download";
+																MelonLogger.Msg("[ManifestEnrichment] Extracted PC target: modId=" + enrichedModIdNum + " fileId=" + fileId);
+															}
+															if (enrichedRefAndroid != -1 && enrichedVal["objects"][enrichedRefAndroid.ToString()] != null)
+															{
+																enrichedModIdNum = (int)enrichedVal["objects"][enrichedRefAndroid.ToString()]["modId"];
+																int fileId = (int)enrichedVal["objects"][enrichedRefAndroid.ToString()]["modfileId"];
+																enrichedAndroidLink = $"https://g-3809.modapi.io/v1/games/3809/mods/{enrichedModIdNum}/files/{fileId}/download";
+																MelonLogger.Msg("[ManifestEnrichment] Extracted Android target: modId=" + enrichedModIdNum + " fileId=" + fileId);
+															}
+
+															// Create display ModInfo from enriched manifest
+															ModInfo displayModInfo = new ModInfo();
+															displayModInfo.version = enrichedVersion;
+															displayModInfo.modId = enrichedModId;
+															displayModInfo.modSummary = enrichedSummary;
+															displayModInfo.thumbnailLink = enrichedThumbnail;
+															displayModInfo.windowsDownloadLink = enrichedWindowsLink;
+															displayModInfo.androidDownloadLink = enrichedAndroidLink;
+															displayModInfo.numericalId = enrichedModIdNum.ToString();
+															displayModInfo.isValidMod = true;
+															displayModInfo.structureVersion = ModInfo.globalStructureVersion;
+
+															// Copy additional fields from modinfo.json that the manifest doesn't store
+															displayModInfo.modName = modInfoFromFile.modName ?? enrichedModId;
+															displayModInfo.author = modInfoFromFile.author ?? "ModIoModNetworker";
+															displayModInfo.fileSizeKB = modInfoFromFile.fileSizeKB;
+															displayModInfo.fileName = modInfoFromFile.fileName;
+															displayModInfo.tags = modInfoFromFile.tags;
+															displayModInfo.mature = modInfoFromFile.mature;
+
+															NetworkerMenuController.totalInstalled.Add(displayModInfo);
+															installedMods.Add(displayModInfo);
+															MelonLogger.Msg("[ManifestEnrichment] ✅ Added enriched mod " + enrichedModId + " to installed mods list (now " + installedMods.Count + " total)");
+														}
+														catch (Exception reparseEx)
+														{
+															MelonLogger.Error("[ManifestEnrichment] Failed to reparse enriched manifest for " + manifestFilePath + ": " + reparseEx.Message);
+														}
+													}
+													else
+													{
+														MelonLogger.Warning("[ManifestEnrichment] Re-read of " + manifestFilePath + " STILL has no objects[\"2\"] — LoadAndUpdatePalletManifest may not have written to disk");
+													}
+												}
+											}
+											catch (Exception enrichEx)
+											{
+												MelonLogger.Error("[ManifestEnrichment] LoadAndUpdatePalletManifest FAILED for " + barcode + ": " + enrichEx.Message);
+											}
+										}
+										else
+										{
+											MelonLogger.Warning("[ManifestEnrichment] Existing manifest or Pallet was null for barcode " + barcode + " — cannot enrich");
+										}
+									}
+									else
+									{
+										MelonLogger.Warning("[ManifestEnrichment] Could not find pallet for barcode '" + barcode + "' in AssetWarehouse — pallet may not be loaded yet");
+									}
+								}
+							}
+						}
+					}
+				}
+				catch (Exception ex2)
+				{
+					MelonLogger.Error("[ManifestEnrichment] Option B failed for " + manifestFilePath + ": " + ex2.Message);
+				}
 			}
 		}
 		MelonLogger.Msg("PopulateInstalledMods: Found " + installedMods.Count + " installed mods in " + directory);
+		MelonLogger.Msg("PopulateInstalledMods: Total mod files found in directory: " + files.Length + " — " + installedMods.Count + " parsed successfully, " + (files.Length - installedMods.Count) + " enriched or skipped");
 	}
 
 	public void OnStartServer()

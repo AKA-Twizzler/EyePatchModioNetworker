@@ -150,7 +150,7 @@ public class ModInfo
 			val.Version = version;
 			val.Targets = new StringModTargetListingDictionary();
 			ModIOModTarget val2 = new ModIOModTarget();
-			((ModTarget)val2).ThumbnailOverride = null;
+			val2.ThumbnailOverride = null;
 			val2.GameId = 3809L;
 			val2.ModId = long.Parse(numericalId);
 			try
@@ -163,9 +163,9 @@ public class ModInfo
 			catch (Exception)
 			{
 			}
-			((Dictionary<string, ModTarget>)(object)val.Targets).Add("pc", (ModTarget)(object)val2);
+			val.Targets.Add("pc", val2);
 			ModIOModTarget val3 = new ModIOModTarget();
-			((ModTarget)val3).ThumbnailOverride = null;
+			val3.ThumbnailOverride = null;
 			val3.GameId = 3809L;
 			val3.ModId = long.Parse(numericalId);
 			try
@@ -178,9 +178,9 @@ public class ModInfo
 			catch (Exception)
 			{
 			}
-			((Dictionary<string, ModTarget>)(object)val.Targets).Add("android", (ModTarget)(object)val3);
+			val.Targets.Add("android", val3);
 			string text = ToInfoString();
-			((Dictionary<string, ModTarget>)(object)val.Targets).Add(text, (ModTarget)(object)val2);
+			val.Targets.Add(text, val2);
 		}
 		catch (Exception ex3)
 		{
