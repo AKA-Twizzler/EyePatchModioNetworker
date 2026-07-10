@@ -911,6 +911,7 @@ public class MainClass : MelonMod
 			{
 			}
 		}
+		MelonLogger.Msg("PopulateInstalledMods: Found " + installedMods.Count + " installed mods in " + directory);
 	}
 
 	public void OnStartServer()
