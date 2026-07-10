@@ -271,11 +271,11 @@ public class ModFileManager
 		if (!fetchingSubscriptions)
 		{
 			fetchingSubscriptions = true;
-			UnityWebRequest httpWebRequest = UnityWebRequest.Get("https://g-3809.modapi.io/v1/me/subscribed?_offset=" + shown + "&limit=400&game_id=3809");
+			UnityWebRequest httpWebRequest = UnityWebRequest.Get("https://mod.io/v1/me/subscribed?_offset=" + shown + "&limit=400&game_id=3809");
 			httpWebRequest.SetRequestHeader("Authorization", "Bearer " + OAUTH_KEY);
 			httpWebRequest.SetRequestHeader("X-Modio-Platform", "windows");
 			httpWebRequest.SetRequestHeader("X-Modio-Portal", "steam");
-			MelonLogger.Msg("QueueSubscriptions: Requesting URL: " + "https://g-3809.modapi.io/v1/me/subscribed?_offset=" + shown + "&limit=400&game_id=3809");
+			MelonLogger.Msg("QueueSubscriptions: Requesting URL: " + "https://mod.io/v1/me/subscribed?_offset=" + shown + "&limit=400&game_id=3809");
 			UnityWebRequestAsyncOperation val = httpWebRequest.SendWebRequest();
 		((AsyncOperation)val).m_completeCallback = ((AsyncOperation)val).m_completeCallback + new Action<AsyncOperation>(delegate
 		{
