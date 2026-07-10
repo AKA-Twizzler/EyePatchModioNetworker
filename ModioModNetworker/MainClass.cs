@@ -802,6 +802,17 @@ public class MainClass : MelonMod
 
 	public void PopulateInstalledMods(string directory)
 	{
+		if (string.IsNullOrEmpty(directory))
+		{
+			MelonLogger.Warning("PopulateInstalledMods: MOD_FOLDER_PATH is empty — no mods directory configured. Set 'ModsFolder' in ModioModNetworker.cfg");
+			return;
+		}
+		if (!Directory.Exists(directory))
+		{
+			MelonLogger.Warning("PopulateInstalledMods: Directory not found: '" + directory + "' — no installed mods to display");
+			return;
+		}
+		MelonLogger.Msg("PopulateInstalledMods: Scanning " + directory);
 		List<DirectoryInfo> list = new List<DirectoryInfo>();
 		try
 		{
@@ -809,8 +820,9 @@ public class MainClass : MelonMod
 				orderby f.LastWriteTime descending
 				select f).ToList();
 		}
-		catch (Exception)
+		catch (Exception ex)
 		{
+			MelonLogger.Error("PopulateInstalledMods: Error reading directory listing: " + ex.Message);
 		}
 		if (1 == 0)
 		{

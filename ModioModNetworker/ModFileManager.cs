@@ -266,16 +266,25 @@ public class ModFileManager
 		}
 	}
 
-	public static void QueueSubscriptions(int shown)
+		public static void QueueSubscriptions(int shown)
 	{
 		if (!fetchingSubscriptions)
 		{
 			fetchingSubscriptions = true;
-			UnityWebRequest httpWebRequest = UnityWebRequest.Get("https://g-3809.modapi.io/v1/me/subscribed?_offset=" + shown + "&limit=400");
+			UnityWebRequest httpWebRequest = UnityWebRequest.Get("https://g-3809.modapi.io/v1/me/subscribed?_offset=" + shown + "&limit=400&game_id=3809");
 			httpWebRequest.SetRequestHeader("Authorization", "Bearer " + OAUTH_KEY);
+			httpWebRequest.SetRequestHeader("X-Modio-Platform", "windows");
+			httpWebRequest.SetRequestHeader("X-Modio-Portal", "steam");
 			UnityWebRequestAsyncOperation val = httpWebRequest.SendWebRequest();
 		((AsyncOperation)val).m_completeCallback = ((AsyncOperation)val).m_completeCallback + new Action<AsyncOperation>(delegate
 		{
+			if (httpWebRequest.result != UnityWebRequest.Result.Success)
+			{
+				MelonLogger.Error("QueueSubscriptions failed: " + httpWebRequest.error + " (response code: " + httpWebRequest.responseCode + ")");
+				fetchingSubscriptions = false;
+				return;
+			}
+			MelonLogger.Msg("QueueSubscriptions OK: " + httpWebRequest.responseCode + " (" + httpWebRequest.downloadHandler.text.Length + " chars)");
 			MainClass.subscriptionThreadString = httpWebRequest.downloadHandler.text;
 			fetchingSubscriptions = false;
 		});
