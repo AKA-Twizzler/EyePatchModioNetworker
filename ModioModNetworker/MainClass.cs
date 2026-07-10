@@ -174,7 +174,16 @@ public class MainClass : MelonMod
 			MelonLogger.Error("Failed to load UI asset bundle - modio menu will be unavailable");
 		}
 		PrepareModFiles();
-		string text = ReadAuthKey();
+		string authKey = ReadAuthKey();
+		if (!string.IsNullOrEmpty(authKey))
+		{
+			ModFileManager.OAUTH_KEY = authKey;
+			MelonLogger.Msg("Loaded OAUTH key from auth.txt (" + authKey.Length + " chars)");
+		}
+		else
+		{
+			MelonLogger.Warning("auth.txt is empty or invalid — will use game/Fusion token if available");
+		}
 		blacklistedModIoIds = ReadBlacklist();
 		MelonLogger.Msg("Loaded blacklist with " + blacklistedModIoIds.Count + " entries.");
 		ModIOSettings.LoadToken((Action<string>)OnLoadToken);
@@ -182,6 +191,12 @@ public class MainClass : MelonMod
 		ModuleManager.RegisterModule<ModlistModule>();
 		ModFileManager.Initialize();
 		ModlistMenu.Initialize();
+		// If we already have auth from auth.txt, trigger data population immediately
+		// without waiting for Fusion's async LoadToken callback
+		if (!string.IsNullOrEmpty(ModFileManager.OAUTH_KEY))
+		{
+			OnLoadToken(ModFileManager.OAUTH_KEY);
+		}
 		MultiplayerHooking.OnPlayerJoined += new PlayerUpdate(OnPlayerJoin);
 		MultiplayerHooking.OnDisconnected += new ServerEvent(OnDisconnect);
 		MultiplayerHooking.OnStartedServer += new ServerEvent(OnStartServer);
@@ -206,16 +221,37 @@ public class MainClass : MelonMod
 		}));
 		void OnLoadToken(string loadedToken)
 		{
-			ModFileManager.OAUTH_KEY = loadedToken;
-			MelonLogger.Msg("Populating currently installed mods via this mod.");
-			installedMods.Clear();
-			InstalledModInfos.Clear();
-			PopulateInstalledMods(ModFileManager.MOD_FOLDER_PATH);
-			loadedInstalled = true;
-			MelonLogger.Msg("Checking mod.io account subscriptions");
-			PopulateSubscriptions();
-			ModFileManager.QueueTrending(0);
-			MelonLogger.Msg("Registered on mod.io with auth key!");
+			// Guard: don't re-run if already populated from auth.txt
+			if (loadedInstalled)
+			{
+				return;
+			}
+
+			// Remember whether auth came from auth.txt (set before this call) or Fusion
+			bool fromAuthTxt = !string.IsNullOrEmpty(ModFileManager.OAUTH_KEY);
+
+			// Only set OAUTH_KEY from Fusion if auth.txt didn't already provide it
+			if (!fromAuthTxt)
+			{
+				ModFileManager.OAUTH_KEY = loadedToken;
+			}
+
+			if (!string.IsNullOrEmpty(ModFileManager.OAUTH_KEY))
+			{
+				MelonLogger.Msg("Populating currently installed mods via this mod. (auth source: " + (fromAuthTxt ? "auth.txt" : "game/Fusion") + ")");
+				installedMods.Clear();
+				InstalledModInfos.Clear();
+				PopulateInstalledMods(ModFileManager.MOD_FOLDER_PATH);
+				loadedInstalled = true;
+				MelonLogger.Msg("Checking mod.io account subscriptions");
+				PopulateSubscriptions();
+				ModFileManager.QueueTrending(0);
+				MelonLogger.Msg("Registered on mod.io with auth key!");
+			}
+			else
+			{
+				MelonLogger.Error("No auth token available from auth.txt or game/Fusion — mod.io features will be unavailable");
+			}
 		}
 	}
 
