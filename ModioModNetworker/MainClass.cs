@@ -26,6 +26,7 @@ using ModioModNetworker.Queue;
 using ModioModNetworker.UI;
 using ModioModNetworker.Utilities;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 using UnityEngine;
 using UnityEngine.AddressableAssets.ResourceLocators;
@@ -833,9 +834,38 @@ public class MainClass : MelonMod
 		{
 			if (!text.EndsWith(".manifest"))
 			{
+				MelonLogger.Msg("PopulateInstalledMods: Skipping non-manifest file: " + text);
 				continue;
 			}
+			MelonLogger.Msg("PopulateInstalledMods: Found manifest file: " + text);
 			dynamic val = JsonConvert.DeserializeObject<object>(File.ReadAllText(text));
+			// Log top-level JSON keys to verify manifest structure
+			try
+			{
+				JObject jsonObj = JObject.Parse(File.ReadAllText(text));
+				string keys = "";
+				foreach (var prop in jsonObj.Properties())
+				{
+					keys += prop.Name + ", ";
+				}
+				if (jsonObj["objects"] != null)
+				{
+					string objKeys = "";
+					foreach (var prop in ((JObject)jsonObj["objects"]).Properties())
+					{
+						objKeys += prop.Name + ", ";
+					}
+					MelonLogger.Msg("PopulateInstalledMods: Manifest '" + Path.GetFileName(text) + "' top keys: " + keys + " | objects child keys: " + objKeys);
+				}
+				else
+				{
+					MelonLogger.Warning("PopulateInstalledMods: Manifest '" + Path.GetFileName(text) + "' has NO 'objects' key at all!");
+				}
+			}
+			catch (Exception ex2)
+			{
+				MelonLogger.Error("PopulateInstalledMods: Failed to parse manifest JSON structure from " + text + ": " + ex2.Message);
+			}
 			ModInfo modInfo = new ModInfo();
 			try
 			{
@@ -907,8 +937,9 @@ public class MainClass : MelonMod
 				InstalledModInfo item = installedModInfo;
 				InstalledModInfos.Add(item);
 			}
-			catch (Exception)
+			catch (Exception ex)
 			{
+				MelonLogger.Error("PopulateInstalledMods: Failed to parse manifest " + text + ": " + ex.Message);
 			}
 		}
 		MelonLogger.Msg("PopulateInstalledMods: Found " + installedMods.Count + " installed mods in " + directory);

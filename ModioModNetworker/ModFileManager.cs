@@ -275,17 +275,20 @@ public class ModFileManager
 			httpWebRequest.SetRequestHeader("Authorization", "Bearer " + OAUTH_KEY);
 			httpWebRequest.SetRequestHeader("X-Modio-Platform", "windows");
 			httpWebRequest.SetRequestHeader("X-Modio-Portal", "steam");
+			MelonLogger.Msg("QueueSubscriptions: Requesting URL: " + "https://g-3809.modapi.io/v1/me/subscribed?_offset=" + shown + "&limit=400&game_id=3809");
 			UnityWebRequestAsyncOperation val = httpWebRequest.SendWebRequest();
 		((AsyncOperation)val).m_completeCallback = ((AsyncOperation)val).m_completeCallback + new Action<AsyncOperation>(delegate
 		{
 			if (httpWebRequest.result != UnityWebRequest.Result.Success)
 			{
-				MelonLogger.Error("QueueSubscriptions failed: " + httpWebRequest.error + " (response code: " + httpWebRequest.responseCode + ")");
+				string errorText = (httpWebRequest.downloadHandler != null && !string.IsNullOrEmpty(httpWebRequest.downloadHandler.text)) ? httpWebRequest.downloadHandler.text : "(no response body)";
+				MelonLogger.Error("QueueSubscriptions FAILED: url=" + httpWebRequest.url + " result=" + httpWebRequest.result + " code=" + httpWebRequest.responseCode + " error=" + httpWebRequest.error + " body=" + (errorText.Length > 200 ? errorText.Substring(0, 200) : errorText));
 				fetchingSubscriptions = false;
 				return;
 			}
-			MelonLogger.Msg("QueueSubscriptions OK: " + httpWebRequest.responseCode + " (" + httpWebRequest.downloadHandler.text.Length + " chars)");
-			MainClass.subscriptionThreadString = httpWebRequest.downloadHandler.text;
+			string responseText = httpWebRequest.downloadHandler.text;
+			MelonLogger.Msg("QueueSubscriptions SUCCESS: url=" + httpWebRequest.url + " code=" + httpWebRequest.responseCode + " body=" + (responseText.Length > 200 ? responseText.Substring(0, 200) : responseText));
+			MainClass.subscriptionThreadString = responseText;
 			fetchingSubscriptions = false;
 		});
 
