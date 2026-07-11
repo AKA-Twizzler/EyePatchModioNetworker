@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Text;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
@@ -290,6 +291,10 @@ public class ModFileManager
 					await fs.WriteAsync(buffer, 0, bytesReceived);
 					bytesRead += bytesReceived;
 					int progress = totalBytes > 0 ? (int)(bytesRead * 100 / totalBytes) : 0;
+					if (lastProgressReported == 0)
+					{
+						MelonLogger.Msg("[DownloadProgress] " + (modInfo?.modName ?? modInfo?.modId ?? "unknown") + ": 0% — download started (" + bytesRead + "/" + totalBytes + " bytes)");
+					}
 					if (totalBytes > 0 && progress >= lastProgressReported + 25)
 					{
 						lastProgressReported = progress;
@@ -573,7 +578,8 @@ public class ModFileManager
 						client.DefaultRequestHeaders.Add("Authorization", "Bearer " + OAUTH_KEY);
 						client.Timeout = TimeSpan.FromSeconds(30);
 
-						HttpResponseMessage response = await client.PostAsync(url, null);
+						var content = new StringContent("", Encoding.UTF8, "application/x-www-form-urlencoded");
+						HttpResponseMessage response = await client.PostAsync(url, content);
 						string responseBody = await response.Content.ReadAsStringAsync();
 						int statusCode = (int)response.StatusCode;
 
@@ -658,6 +664,7 @@ public class ModFileManager
 					using (HttpClient client = new HttpClient(socketsHandler))
 					{
 						client.DefaultRequestHeaders.Add("Authorization", "Bearer " + OAUTH_KEY);
+						client.DefaultRequestHeaders.Add("Content-Type", "application/x-www-form-urlencoded");
 						client.Timeout = TimeSpan.FromSeconds(30);
 
 						HttpResponseMessage response = await client.DeleteAsync(url);
@@ -728,6 +735,12 @@ public class ModFileManager
 		}
 		catch (Exception ex)
 		{
+			if (ex is System.IO.DirectoryNotFoundException || ex is System.IO.FileNotFoundException)
+			{
+				MelonLogger.Warning("[UnInstall] Files already deleted for " + numericalId + " — skipping RequestInstallCheck to prevent retry loop");
+				// Don't call RequestInstallCheck - files are already gone
+				return;
+			}
 			MelonLogger.Error("[UnInstall] Exception when uninstalling mod " + numericalId + ": " + ex);
 		}
 		MelonLogger.Msg("[UnInstall] Calling RequestInstallCheck after uninstall");
