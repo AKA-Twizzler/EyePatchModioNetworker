@@ -51,6 +51,8 @@ public class ModFileManager
 
 	public static string[] targetVersionStrings = new string[2] { "1.1", "1.2" };
 
+	private static bool previousQueueHadItems = false;
+
 	public static void Initialize()
 	{
 		ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
@@ -121,7 +123,16 @@ public class ModFileManager
 		// Only log when there's actually something to process or a state change
 		if (queue.Count == 0 && !MainClass.warehouseReloadRequested)
 			return;
-		MelonLogger.Msg("[DownloadQueue] CheckQueue: queue=" + queue.Count + " isDownloading=" + isDownloading + " warehouseReady=" + (AssetWarehouse.Instance != null));
+		// Only log on state transitions to avoid spam
+		bool queueHasItems = queue.Count > 0 || isDownloading;
+		if (queueHasItems != previousQueueHadItems)
+		{
+			previousQueueHadItems = queueHasItems;
+			if (queueHasItems)
+				MelonLogger.Msg("[DownloadQueue] Queue now active — items=" + queue.Count + " isDownloading=" + isDownloading);
+			else
+				MelonLogger.Msg("[DownloadQueue] Queue idle — all downloads complete");
+		}
 		if (isDownloading || AssetWarehouse.Instance == null || SceneStreamer._session == null || (int)SceneStreamer._session.Status == 1 || queue.Count <= 0)
 		{
 			return;
@@ -388,7 +399,7 @@ public class ModFileManager
 		UnityWebRequestAsyncOperation val = httpWebRequest.SendWebRequest();
 		((AsyncOperation)val).m_completeCallback = ((AsyncOperation)val).m_completeCallback + new Action<AsyncOperation>(delegate
 		{
-			if (httpWebRequest.responseCode == 201L)
+			if (httpWebRequest.responseCode == 201L || httpWebRequest.responseCode == 200L)
 			{
 				MelonLogger.Msg("[Subscribe] Successfully subscribed to mod " + numericalid);
 				MainThreadManager.QueueAction(delegate
