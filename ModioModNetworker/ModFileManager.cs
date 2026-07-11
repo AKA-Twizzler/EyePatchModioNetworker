@@ -41,6 +41,11 @@ public class ModFileManager
 
 	public static bool fetchingSubscriptions = false;
 
+	public static bool IsFetchingSubscriptions()
+	{
+		return fetchingSubscriptions;
+	}
+
 	public static bool fetchingTrending = false;
 
 	public static DownloadAction activeDownloadAction = null;
@@ -353,6 +358,7 @@ public class ModFileManager
 				string errorText = (httpWebRequest.downloadHandler != null && !string.IsNullOrEmpty(httpWebRequest.downloadHandler.text)) ? httpWebRequest.downloadHandler.text : "(no response body)";
 				MelonLogger.Error("QueueSubscriptions FAILED: url=" + httpWebRequest.url + " result=" + httpWebRequest.result + " code=" + httpWebRequest.responseCode + " error=" + httpWebRequest.error + " body=" + (errorText.Length > 200 ? errorText.Substring(0, 200) : errorText));
 				fetchingSubscriptions = false;
+				MainClass.HandleSubscriptionFailure();
 				return;
 			}
 			string responseText = httpWebRequest.downloadHandler.text;

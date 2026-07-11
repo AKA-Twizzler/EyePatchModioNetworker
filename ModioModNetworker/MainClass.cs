@@ -134,6 +134,8 @@ public class MainClass : MelonMod
 
 	public static bool handlingSubscribed = false;
 
+	private static DateTime lastSubRefreshAttempt = DateTime.UtcNow;
+
 	private bool assetWarehouseLoaded = false;
 
 	// Deferred enrichment queue — processes after AssetWarehouse loads pallets
@@ -388,6 +390,28 @@ public class MainClass : MelonMod
 			ModFileManager.activeDownloadAction.Handle();
 			ModFileManager.activeDownloadAction = null;
 		}
+		// Safety timeout — if handlingSubscribed is stuck for >15 seconds, force-reset
+		if (handlingSubscribed && !subsRefreshing && subscriptionThreadString == "")
+		{
+			double elapsed = (DateTime.UtcNow - lastSubRefreshAttempt).TotalSeconds;
+			if (elapsed > 15.0)
+			{
+				MelonLogger.Warning("[Subscription] Safety timeout — handlingSubscribed stuck for " + elapsed.ToString("F0") + " seconds, force-resetting");
+				handlingSubscribed = false;
+				subsRefreshing = false;
+				refreshSubscribedModsRequested = false;
+			}
+		}
+		// Safety: If handlingSubscribed is stuck (QueueSubscriptions never returned), force-reset
+		if (handlingSubscribed && !subsRefreshing)
+		{
+			if (subscriptionThreadString == "" && !ModFileManager.IsFetchingSubscriptions())
+			{
+				MelonLogger.Warning("[Subscription] Subscription refresh appears to have failed — resetting state");
+				handlingSubscribed = false;
+				subsRefreshing = false;
+			}
+		}
 		if (subsRefreshing && subscribedModIoNumericalIds.Count >= desiredSubs)
 		{
 			foreach (string toRemoveSubscribedModIoId in toRemoveSubscribedModIoIds)
@@ -396,6 +420,7 @@ public class MainClass : MelonMod
 			}
 			toRemoveSubscribedModIoIds.Clear();
 			ModlistMenu.Refresh(openMenu: true);
+			MelonLogger.Msg("[Subscription] Refresh complete — " + subscribedModIoNumericalIds.Count + " subscriptions synced");
 			subsRefreshing = false;
 			handlingSubscribed = false;
 			Notifier.Send(new Notification
@@ -523,11 +548,12 @@ public class MainClass : MelonMod
 		{
 			refreshSubscribedModsRequested = false;
 			handlingSubscribed = true;
-			subscribedMods.Clear();
-			subscribedModIoNumericalIds.Clear();
+			lastSubRefreshAttempt = DateTime.UtcNow;
+			// Don't clear lists yet — will clear AFTER API succeeds
 			subTotal = 0;
 			subsShown = 0;
 			desiredSubs = 0;
+			MelonLogger.Msg("[Subscription] Refresh button pressed — requesting subscription list from mod.io");
 			ModFileManager.QueueSubscriptions(subsShown);
 		}
 		if (refreshInstalledModsRequested && !handlingSubscribed && !handlingInstalled)
@@ -647,6 +673,15 @@ public class MainClass : MelonMod
 		refreshSubscribedModsRequested = true;
 	}
 
+	public static void HandleSubscriptionFailure()
+	{
+		MelonLogger.Warning("[Subscription] QueueSubscriptions API call failed — resetting state to prevent deadlock");
+		handlingSubscribed = false;
+		subsRefreshing = false;
+		refreshSubscribedModsRequested = false;
+		MelonLogger.Warning("[Subscription] State has been reset — UI will continue using existing subscription data");
+	}
+
 	private static void InternalPopulateTrending()
 	{
 		string text = trendingThreadString;
@@ -740,9 +775,16 @@ public class MainClass : MelonMod
 		int num3 = (int)val["result_count"];
 		if (num3 == 0)
 		{
-			MelonLogger.Msg("No subscriptions found!");
+			MelonLogger.Msg("[Subscription] No subscriptions found!");
+			handlingSubscribed = false;
+			subsRefreshing = false;
+			MelonLogger.Warning("[Subscription] State reset — no subscription data returned from API");
 			return;
 		}
+		// API confirmed data — safe to clear old lists
+		MelonLogger.Msg("[Subscription] API returned " + num3 + " subscriptions — clearing old lists");
+		subscribedMods.Clear();
+		subscribedModIoNumericalIds.Clear();
 		foreach (dynamic item in val["data"])
 		{
 			if ((int)item["game_id"] == 3809)
