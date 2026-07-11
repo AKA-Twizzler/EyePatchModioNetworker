@@ -684,7 +684,7 @@ public class NetworkerMenuController : MonoBehaviour
 		}
 		else
 		{
-			component3.text = modInfo3.modName;
+			component3.text = modInfo3.modSummary;
 		}
 		if (spotlightOverride.descriptionOverride != null)
 		{
@@ -692,7 +692,7 @@ public class NetworkerMenuController : MonoBehaviour
 		}
 		else
 		{
-			component4.text = modInfo3.modSummary;
+			component4.text = modInfo3.modName;
 		}
 	}
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using MelonLoader;
 using Il2CppSLZ.Marrow.Data;
 using Il2CppSLZ.Marrow.Pool;
 using Il2CppSLZ.Marrow.Warehouse;
@@ -21,6 +22,7 @@ public class SpawnableHoldQueue
 
 	public static void HandleAllSpawnResponseDatas()
 	{
+		MelonLogger.Msg("[SpawnableHoldQueue] HandleAllSpawnResponseDatas — replaying " + spawnResponseDatas.Count + " spawns");
 		foreach (SpawnResponseData spawnResponseData in spawnResponseDatas)
 		{
 			Handle(spawnResponseData);
@@ -30,16 +32,19 @@ public class SpawnableHoldQueue
 
 	public static void AddToQueue(SpawnResponseData data)
 	{
+		MelonLogger.Msg("[SpawnableHoldQueue] AddToQueue — SpawnResponseData");
 		spawnResponseDatas.Add(data);
 	}
 
 	public static void ClearQueue()
 	{
+		MelonLogger.Msg("[SpawnableHoldQueue] ClearQueue called — queueDatas=" + queueDatas.Count + " items");
 		queueDatas.Clear();
 	}
 
 	public static void AddToQueue(SpawnableHoldQueueData data)
 	{
+		MelonLogger.Msg("[SpawnableHoldQueue] AddToQueue — barcode=" + (data.missingBarcode ?? "null"));
 		queueDatas.Add(data);
 	}
 
@@ -50,6 +55,7 @@ public class SpawnableHoldQueue
 		{
 			if (queueData.missingBarcode == barcode)
 			{
+				MelonLogger.Msg("[SpawnableHoldQueue] CheckValid — MATCH for barcode=" + barcode);
 				Handle(queueData._data);
 				toRemove.Add(queueData);
 			}

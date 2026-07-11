@@ -118,10 +118,10 @@ public class ModFileManager
 	{
 		//IL_003a: Unknown result type (might be due to invalid IL or missing references)
 		//IL_0040: Invalid comparison between Unknown and I4
-		MelonLogger.Msg("[DownloadQueue] CheckQueue: queue=" + queue.Count + " isDownloading=" + isDownloading + " warehouseReady=" + (AssetWarehouse.Instance != null));
 		// Suppress log spam — no need to log every frame when idle
 		if (queue.Count == 0 && !isDownloading && !MainClass.warehouseReloadRequested)
 			return;
+		MelonLogger.Msg("[DownloadQueue] CheckQueue: queue=" + queue.Count + " isDownloading=" + isDownloading + " warehouseReady=" + (AssetWarehouse.Instance != null));
 		if (isDownloading || AssetWarehouse.Instance == null || SceneStreamer._session == null || (int)SceneStreamer._session.Status == 1 || queue.Count <= 0)
 		{
 			return;
@@ -275,7 +275,7 @@ public class ModFileManager
 
 	public static async Task DownloadFileAsync(string url, string path)
 	{
-		DownloadFileHttpClient(url, path);
+		await DownloadFileHttpClient(url, path);
 	}
 
 	public static void DownloadFile(string url, string path)
@@ -342,6 +342,8 @@ public class ModFileManager
 			SpotlightOverride.LoadFromRegularURL();
 			UnityWebRequest httpWebRequest = UnityWebRequest.Get($"https://mod.io/v1/games/@bonelab/mods?_limit=100&_offset={offset}&_sort=-popular" + text);
 			httpWebRequest.SetRequestHeader("Authorization", "Bearer " + OAUTH_KEY);
+			httpWebRequest.SetRequestHeader("X-Modio-Platform", "windows");
+			httpWebRequest.SetRequestHeader("X-Modio-Portal", "steam");
 			UnityWebRequestAsyncOperation val = httpWebRequest.SendWebRequest();
 		((AsyncOperation)val).m_completeCallback = ((AsyncOperation)val).m_completeCallback + new Action<AsyncOperation>(delegate
 		{
@@ -354,7 +356,7 @@ public class ModFileManager
 
 	public static bool Subscribe(string numericalid)
 	{
-		string text = API_PATH + numericalid + "/subscribe";
+		string text = "https://mod.io/v1/games/3809/mods/" + numericalid + "/subscribe";
 		UnityWebRequest httpWebRequest = UnityWebRequest.Get(text);
 		httpWebRequest.method = "POST";
 		httpWebRequest.SetRequestHeader("Authorization", "Bearer " + OAUTH_KEY);
@@ -362,8 +364,9 @@ public class ModFileManager
 		UnityWebRequestAsyncOperation val = httpWebRequest.SendWebRequest();
 		((AsyncOperation)val).m_completeCallback = ((AsyncOperation)val).m_completeCallback + new Action<AsyncOperation>(delegate
 		{
-			if (httpWebRequest.responseCode == 201)
+			if (httpWebRequest.responseCode == 201L)
 			{
+				MelonLogger.Msg("[Subscribe] Successfully subscribed to mod " + numericalid);
 				MainThreadManager.QueueAction(delegate
 				{
 					if ((UnityEngine.Object)(object)NetworkerMenuController.instance != null)
@@ -371,7 +374,10 @@ public class ModFileManager
 						NetworkerMenuController.instance.UpdateModPopupButtons();
 					}
 				});
-
+			}
+			else
+			{
+				MelonLogger.Error("[Subscribe] Failed to subscribe to mod " + numericalid + ": responseCode=" + httpWebRequest.responseCode + " error=" + (httpWebRequest.error ?? "none"));
 			}
 		});
 
@@ -386,7 +392,7 @@ public class ModFileManager
 
 	public static void UnSubscribe(string numericalId)
 	{
-		string text = API_PATH + numericalId + "/subscribe";
+		string text = "https://mod.io/v1/games/3809/mods/" + numericalId + "/subscribe";
 		UnityWebRequest val = UnityWebRequest.Get(text);
 		val.method = "DELETE";
 		val.SetRequestHeader("Authorization", "Bearer " + OAUTH_KEY);
@@ -394,15 +400,22 @@ public class ModFileManager
 		UnityWebRequestAsyncOperation val2 = val.SendWebRequest();
 		((AsyncOperation)val2).m_completeCallback = ((AsyncOperation)val2).m_completeCallback + new Action<AsyncOperation>(delegate
 		{
-			MainThreadManager.QueueAction(delegate
+			if (val.responseCode == 204L)
 			{
-				if ((UnityEngine.Object)(object)NetworkerMenuController.instance != null)
+				MelonLogger.Msg("[Subscribe] Successfully unsubscribed from mod " + numericalId);
+				MainThreadManager.QueueAction(delegate
 				{
-					MainClass.subscribedModIoNumericalIds.Remove(numericalId);
-					NetworkerMenuController.instance.UpdateModPopupButtons();
-				}
-			});
-
+					if ((UnityEngine.Object)(object)NetworkerMenuController.instance != null)
+					{
+						MainClass.subscribedModIoNumericalIds.Remove(numericalId);
+						NetworkerMenuController.instance.UpdateModPopupButtons();
+					}
+				});
+			}
+			else
+			{
+				MelonLogger.Error("[Subscribe] Failed to unsubscribe from mod " + numericalId + ": responseCode=" + val.responseCode + " error=" + (val.error ?? "none"));
+			}
 		});
 
 	}

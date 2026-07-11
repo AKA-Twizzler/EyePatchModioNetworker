@@ -1,3 +1,4 @@
+using MelonLoader;
 using Il2CppSLZ.Marrow.SceneStreaming;
 using LabFusion.Network;
 using LabFusion.Scene;
@@ -24,6 +25,7 @@ public class LevelHoldQueue
 
 	public static void ClearQueue()
 	{
+		MelonLogger.Msg("[LevelHoldQueue] ClearQueue called");
 		queueData = null;
 		waitingForLevel = false;
 		waitingForLevelToLoad = false;
@@ -37,6 +39,7 @@ public class LevelHoldQueue
 
 	public static void SetQueue(LevelHoldQueueData data)
 	{
+		MelonLogger.Msg("[LevelHoldQueue] SetQueue — barcode=" + (data.missingBarcode ?? "null"));
 		//IL_0001: Unknown result type (might be due to invalid IL or missing references)
 		//IL_0006: Unknown result type (might be due to invalid IL or missing references)
 		//IL_001c: Unknown result type (might be due to invalid IL or missing references)
@@ -61,6 +64,7 @@ public class LevelHoldQueue
 	{
 		if (queueData != null && queueData.missingBarcode == barcode)
 		{
+			MelonLogger.Msg("[LevelHoldQueue] CheckValid — MATCH for barcode=" + barcode + " calling Handle");
 			Handle(queueData._data);
 			waitingForLevel = true;
 			queueData = null;
@@ -77,11 +81,13 @@ public class LevelHoldQueue
 		//IL_00b5: Invalid comparison between Unknown and I4
 		if (waitingForLevel && SceneStreamer._session != null && (int)SceneStreamer._session.Status == 1)
 		{
+			MelonLogger.Msg("[LevelHoldQueue] Update — level loading started: " + (queueData != null ? (queueData.missingBarcode ?? "unknown") : "null"));
 			waitingForLevelToLoad = true;
 			waitingForLevel = false;
 		}
 		if (waitingForLevelToLoad && SceneStreamer._session != null && (int)SceneStreamer._session.Status != 1)
 		{
+			MelonLogger.Msg("[LevelHoldQueue] Update — level load complete: " + (queueData != null ? (queueData.missingBarcode ?? "unknown") : "null"));
 			waitingForLevelToLoad = false;
 			finishedLoadingLevel = true;
 		}
@@ -98,6 +104,7 @@ public class LevelHoldQueue
 
 	private static void Handle(LevelLoadData data)
 	{
+		MelonLogger.Msg("[LevelHoldQueue] Handle — calling FusionSceneManager.SetTargetScene barcode=" + data.LevelBarcode);
 		FusionSceneManager.SetTargetScene(data.LevelBarcode, data.LoadingScreenBarcode);
 		NetworkSceneManager.Purgatory = false;
 	}

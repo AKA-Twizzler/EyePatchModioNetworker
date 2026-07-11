@@ -407,6 +407,12 @@ public class MainClass : MelonMod
 			MelonLogger.Msg("Finished refreshing mod.io subscriptions!");
 			outOfDateModInfos.Clear();
 		}
+		if (warehouseReloadRequested && (!assetWarehouseLoaded || !AssetWarehouse.Instance._initialLoaded || palletLock))
+		{
+			if (palletLock) MelonLogger.Warning("[WarehouseReload] Blocked by palletLock=true");
+			if (!assetWarehouseLoaded) MelonLogger.Warning("[WarehouseReload] Blocked by warehouse not loaded");
+			if (!AssetWarehouse.Instance._initialLoaded) MelonLogger.Warning("[WarehouseReload] Blocked by _initialLoaded=false");
+		}
 		if (warehouseReloadRequested && assetWarehouseLoaded && AssetWarehouse.Instance._initialLoaded && !palletLock)
 		{
 			MelonLogger.Msg("[WarehouseReload] Starting warehouse reload — folders: " + warehouseReloadFolders.Count + " updates: " + warehousePalletReloadTargets.Count);
@@ -480,10 +486,11 @@ public class MainClass : MelonMod
 				float num = item.fileSizeKB / 1000000f;
 				if (num < maxAutoDownloadMb && autoDownloadAvatars)
 				{
-					if (!downloadMatureContent && item.mature)
-					{
-						return;
-					}
+			if (!downloadMatureContent && item.mature)
+				{
+					MelonLogger.Msg("[AutoDownload] Skipping mature avatar " + (item.modName ?? "unknown") + " — mature content disabled");
+					continue;
+				}
 					ModFileManager.AddToQueue(new DownloadQueueElement
 					{
 						associatedPlayer = null,
@@ -492,6 +499,7 @@ public class MainClass : MelonMod
 					});
 				}
 			}
+			MelonLogger.Msg("[AutoDownload] Processed " + modNumericalsDownloadedDuringLobbySession.Count + " waitAndQueue items — clearing");
 			ModlistMessage.waitAndQueue.Clear();
 		}
 		if (subsChanged)
