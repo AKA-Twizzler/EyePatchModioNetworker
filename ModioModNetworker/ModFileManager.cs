@@ -25,7 +25,7 @@ public class ModFileManager
 {
 	public static string OAUTH_KEY = "";
 
-	public static string API_PATH = "https://g-3809.modapi.io/v1/games/3809/mods/";
+	public static string API_PATH = "https://mod.io/v1/games/3809/mods/";
 
 	public static string MOD_FOLDER_PATH = Application.persistentDataPath + "/Mods";
 
@@ -127,16 +127,20 @@ public class ModFileManager
 			return;
 		}
 		DownloadQueueElement downloadQueueElement = queue[0];
+		activeDownloadQueueElement = downloadQueueElement;  // MUST be set BEFORE Download() for async capture
 		if (downloadQueueElement.info.Download())
 		{
 			queue.RemoveAt(0);
-			activeDownloadQueueElement = downloadQueueElement;
 			MelonLogger.Msg("[DownloadQueue] CheckQueue: Starting download for " + (downloadQueueElement.info.modName ?? downloadQueueElement.info.modId ?? "unknown"));
 			MelonLogger.Msg("Downloading mod " + downloadQueueElement.info.modId);
 			if (activeDownloadQueueElement.associatedPlayer != null && AvatarDownloadBar.bars.TryGetValue(activeDownloadQueueElement.associatedPlayer, out AvatarDownloadBar value))
 			{
 				value.Show();
 			}
+		}
+		else
+		{
+			activeDownloadQueueElement = null;  // Download didn't start, clear
 		}
 		MainClass.menuRefreshRequested = true;
 	}
@@ -563,20 +567,13 @@ public class ModFileManager
 		UnityWebRequestAsyncOperation val = httpWebRequest.SendWebRequest();
 		((AsyncOperation)val).m_completeCallback = ((AsyncOperation)val).m_completeCallback + new Action<AsyncOperation>(delegate
 		{
-			//IL_0007: Unknown result type (might be due to invalid IL or missing references)
-			//IL_000d: Invalid comparison between Unknown and I4
-			//IL_0015: Unknown result type (might be due to invalid IL or missing references)
-			//IL_001b: Invalid comparison between Unknown and I4
-			if ((int)httpWebRequest.result == 2 || (int)httpWebRequest.result == 3)
+			if (httpWebRequest.result != UnityWebRequest.Result.Success)
 			{
-				Debug.LogError(httpWebRequest.error);
-				onCompleted?.Invoke(null);
+				MelonLogger.Error("[ModFileManager] GetJson FAILED: " + text + " — result=" + httpWebRequest.result + " error=" + (httpWebRequest.error ?? "none"));
+				return;
 			}
-			else
-			{
-				string text2 = httpWebRequest.downloadHandler.text;
-				onCompleted?.Invoke(text2);
-			}
+			string text2 = httpWebRequest.downloadHandler.text;
+			onCompleted?.Invoke(text2);
 		});
 
 	}
@@ -592,22 +589,17 @@ public class ModFileManager
 			UnityWebRequestAsyncOperation val = httpWebRequest.SendWebRequest();
 		((AsyncOperation)val).m_completeCallback = ((AsyncOperation)val).m_completeCallback + new Action<AsyncOperation>(delegate
 		{
-			//IL_0033: Unknown result type (might be due to invalid IL or missing references)
-			//IL_0039: Invalid comparison between Unknown and I4
-			//IL_0041: Unknown result type (might be due to invalid IL or missing references)
-			//IL_0047: Invalid comparison between Unknown and I4
+			if (httpWebRequest.result != UnityWebRequest.Result.Success)
+			{
+				MelonLogger.Error("[ModFileManager] GetRawModInfoJson FAILED: " + text + " — result=" + httpWebRequest.result + " error=" + (httpWebRequest.error ?? "none"));
+				// Call callback with null so caller knows it failed
+				onCompleted(null);
+				return;
+			}
 			json = httpWebRequest.downloadHandler.text;
 			dynamic val2 = JsonConvert.DeserializeObject<object>(json);
-			if ((int)httpWebRequest.result == 2 || (int)httpWebRequest.result == 3)
-			{
-				Debug.LogError(httpWebRequest.error);
-				((Action<object>)onCompleted)?.Invoke(val2);
-			}
-			else
-			{
-				((Action<object>)onCompleted)?.Invoke(val2);
-				}
-			});
+			((Action<object>)onCompleted)?.Invoke(val2);
+		});
 
 		}
 		catch (Exception ex)
