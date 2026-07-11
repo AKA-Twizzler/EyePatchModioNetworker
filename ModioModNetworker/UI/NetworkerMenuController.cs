@@ -235,28 +235,48 @@ public class NetworkerMenuController : MonoBehaviour
 
 	public void OnSubscribeButtonPressed(bool selected)
 	{
-		if (selected)
+		MelonLogger.Msg("[Button] OnSubscribeButtonPressed: selected=" + selected + " numericalId=" + (viewedInfo?.numericalId ?? "null") + " modName=" + (viewedInfo?.modName ?? "null") + " modId=" + (viewedInfo?.modId ?? "null"));
+
+		if (selected)  // UNSUBSCRIBE
 		{
+			MelonLogger.Msg("[Button] UNSUBSCRIBE path — calling UnSubscribe for numericalId=" + (viewedInfo?.numericalId ?? "null"));
 			ModFileManager.UnSubscribe(viewedInfo.numericalId);
-			if (viewedInfo.IsInstalled())
+
+			bool isInstalled = viewedInfo.IsInstalled();
+			MelonLogger.Msg("[Button] IsInstalled()=" + isInstalled + " for numericalId=" + (viewedInfo?.numericalId ?? "null"));
+			if (isInstalled)
 			{
+				MelonLogger.Msg("[Button] Calling UnInstall for numericalId=" + (viewedInfo?.numericalId ?? "null"));
 				ModFileManager.UnInstall(viewedInfo.numericalId);
 			}
+			else
+			{
+				MelonLogger.Msg("[Button] SKIPPING UnInstall — IsInstalled() returned false");
+			}
+
+			MelonLogger.Msg("[Button] Removing from subscribedModIoNumericalIds: " + (viewedInfo?.numericalId ?? "null"));
 			MainClass.subscribedModIoNumericalIds.Remove(viewedInfo.numericalId);
 			return;
 		}
+
+		// SUBSCRIBE path
+		MelonLogger.Msg("[Button] SUBSCRIBE path — numericalId=" + (viewedInfo?.numericalId ?? "null"));
 		if (viewedInfo.windowsDownloadLink != "nothing" || viewedInfo.androidDownloadLink != "nothing")
 		{
+			MelonLogger.Msg("[Button] Has download links — calling ReceiveSubModInfo");
 			MainClass.ReceiveSubModInfo(viewedInfo, ignoreTag: true);
 		}
 		else
 		{
+			MelonLogger.Msg("[Button] No download links — calling PopulateSubscriptions");
 			MainClass.PopulateSubscriptions();
 		}
 		if (!MainClass.subscribedModIoNumericalIds.Contains(viewedInfo.numericalId))
 		{
 			MainClass.subscribedModIoNumericalIds.Add(viewedInfo.numericalId);
+			MelonLogger.Msg("[Button] Added to subscribedModIoNumericalIds: " + (viewedInfo?.numericalId ?? "null"));
 		}
+		MelonLogger.Msg("[Button] Calling Subscribe for numericalId=" + (viewedInfo?.numericalId ?? "null"));
 		ModFileManager.Subscribe(viewedInfo.numericalId);
 	}
 
@@ -328,17 +348,26 @@ public class NetworkerMenuController : MonoBehaviour
 
 	public void OnInstallButtonPressed(bool selected)
 	{
-		if (selected)
+		MelonLogger.Msg("[Button] OnInstallButtonPressed: selected=" + selected + " numericalId=" + (viewedInfo?.numericalId ?? "null") + " modName=" + (viewedInfo?.modName ?? "null"));
+
+		if (selected)  // UNINSTALL
 		{
+			MelonLogger.Msg("[Button] UNINSTALL path — calling UnInstall for numericalId=" + (viewedInfo?.numericalId ?? "null"));
 			ModFileManager.UnInstall(viewedInfo.numericalId);
 			if (viewedInfo.IsSubscribed())
 			{
+				MelonLogger.Msg("[Button] Also unsubscribing for numericalId=" + (viewedInfo?.numericalId ?? "null"));
 				ModFileManager.UnSubscribe(viewedInfo.numericalId);
 			}
 			MainClass.subscribedModIoNumericalIds.Remove(viewedInfo.numericalId);
+			return;
 		}
-		else if (viewedInfo.windowsDownloadLink != null)
+
+		// INSTALL path
+		MelonLogger.Msg("[Button] INSTALL path — numericalId=" + (viewedInfo?.numericalId ?? "null"));
+		if (viewedInfo.windowsDownloadLink != null)
 		{
+			MelonLogger.Msg("[Button] Has download link — queuing download for numericalId=" + (viewedInfo?.numericalId ?? "null"));
 			ModFileManager.AddToQueue(new DownloadQueueElement
 			{
 				info = viewedInfo,
@@ -348,6 +377,7 @@ public class NetworkerMenuController : MonoBehaviour
 		}
 		else
 		{
+			MelonLogger.Msg("[Button] No download link — requesting mod info for numericalId=" + (viewedInfo?.numericalId ?? "null"));
 			ModInfo.RequestModInfoNumerical(viewedInfo.numericalId, "install_native");
 		}
 	}

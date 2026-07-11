@@ -536,29 +536,43 @@ public class ModFileManager
 
 	public static void UnInstallMainThread(string numericalId)
 	{
+		MelonLogger.Msg("[UnInstall] UnInstallMainThread called for numericalId=" + numericalId);
+
 		InstalledModInfo installedModInfo = null;
 		foreach (InstalledModInfo installedModInfo2 in MainClass.InstalledModInfos)
 		{
 			if (installedModInfo2.ModInfo.numericalId == numericalId)
 			{
 				installedModInfo = installedModInfo2;
+				break;
 			}
 		}
+
+		if (installedModInfo == null)
+		{
+			MelonLogger.Warning("[UnInstall] No InstalledModInfo found for numericalId=" + numericalId + " — cannot uninstall");
+		}
+
 		try
 		{
 			if (installedModInfo != null)
 			{
 				string palletBarcode = installedModInfo.palletBarcode;
+				MelonLogger.Msg("[UnInstall] Unloading pallet: " + palletBarcode);
 				UnloadPallet(palletBarcode);
+				MelonLogger.Msg("[UnInstall] Deleting manifest: " + installedModInfo.manifestPath);
 				File.Delete(installedModInfo.manifestPath);
 				string fullName = Directory.GetParent(installedModInfo.catalogPath).FullName;
+				MelonLogger.Msg("[UnInstall] Deleting directory: " + fullName);
 				Directory.Delete(fullName, recursive: true);
+				MelonLogger.Msg("[UnInstall] Successfully uninstalled numericalId=" + numericalId);
 			}
 		}
 		catch (Exception ex)
 		{
-			MelonLogger.Error("Exception when uninstalling mod: " + ex);
+			MelonLogger.Error("[UnInstall] Exception when uninstalling mod " + numericalId + ": " + ex);
 		}
+		MelonLogger.Msg("[UnInstall] Calling RequestInstallCheck after uninstall");
 		MainClass.RequestInstallCheck();
 	}
 

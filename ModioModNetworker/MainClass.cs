@@ -337,13 +337,22 @@ public class MainClass : MelonMod
 
 	private void DeleteAllTempMods()
 	{
+		int count = 0;
+		int skipped = 0;
 		foreach (ModInfo installedMod in installedMods)
 		{
 			if (installedMod.temp)
 			{
+				MelonLogger.Msg("[TempMods] Deleting temp mod: " + (installedMod.modName ?? installedMod.numericalId ?? "unknown"));
 				ModFileManager.UnInstallMainThread(installedMod.numericalId);
+				count++;
+			}
+			else
+			{
+				skipped++;
 			}
 		}
+		MelonLogger.Msg("[TempMods] DeleteAllTempMods complete — " + count + " deleted, " + skipped + " skipped out of " + (count + skipped) + " total installed mods");
 	}
 
 	public override void OnUpdate()
@@ -1285,7 +1294,7 @@ public class MainClass : MelonMod
 							(IResourceLocator)null
 						);
 
-						MelonLogger.Msg("[DeferredEnrichment] ✅ Successfully enriched manifest for " + (modInfo.modName ?? barcode));
+						MelonLogger.Msg("[DeferredEnrichment] Successfully enriched manifest for " + (modInfo.modName ?? barcode));
 
 						// Add enriched mod to display lists so it shows in the installed tab
 						if (modInfo != null)
@@ -1293,6 +1302,23 @@ public class MainClass : MelonMod
 							NetworkerMenuController.totalInstalled.Add(modInfo);
 							installedMods.Add(modInfo);
 							MelonLogger.Msg("[DeferredEnrichment] Added " + (modInfo.modName ?? barcode) + " to installed mods list (now " + NetworkerMenuController.totalInstalled.Count + " total installed)");
+
+							// Also add InstalledModInfo so UnInstall/UnInstallMainThread can find this mod
+							try
+							{
+								InstalledModInfo installedInfo = new InstalledModInfo();
+								installedInfo.manifestPath = Path.Combine(ModFileManager.MOD_FOLDER_PATH, barcode + ".manifest");
+								installedInfo.palletBarcode = barcode;
+								installedInfo.palletPath = existingManifest.PalletPath;
+								installedInfo.catalogPath = existingManifest.CatalogPath;
+								installedInfo.ModInfo = modInfo;
+								InstalledModInfos.Add(installedInfo);
+								MelonLogger.Msg("[DeferredEnrichment] Added InstalledModInfo for " + (modInfo.modName ?? barcode) + " — manifestPath=" + installedInfo.manifestPath);
+							}
+							catch (Exception ex)
+							{
+								MelonLogger.Error("[DeferredEnrichment] Failed to create InstalledModInfo for " + (modInfo.modName ?? barcode) + ": " + ex.Message);
+							}
 						}
 
 						succeeded++;
