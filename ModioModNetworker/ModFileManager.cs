@@ -35,6 +35,57 @@ public class ModFileManager
 
 	public static string downloadPath = "";
 
+	private static readonly HttpClient sharedApiClient = CreateApiClient();
+	private static HttpClient CreateApiClient()
+	{
+		try
+		{
+			var handler = new SocketsHttpHandler
+			{
+				SslOptions = new System.Net.Security.SslClientAuthenticationOptions
+				{
+					RemoteCertificateValidationCallback = (sender, cert, chain, errors) => true
+				},
+				ConnectCallback = async (context, cancellationToken) =>
+				{
+					try
+					{
+						var host = context.DnsEndPoint.Host;
+						var addresses = await Dns.GetHostEntryAsync(host);
+						var ipv4 = Array.Find(addresses.AddressList, a => a.AddressFamily == AddressFamily.InterNetwork);
+						if (ipv4 == null)
+						{
+							MelonLogger.Error("[HTTP] No IPv4 address found for " + host + " — trying default");
+							var defaultSocket = new Socket(SocketType.Stream, ProtocolType.Tcp);
+							await defaultSocket.ConnectAsync(context.DnsEndPoint, cancellationToken);
+							return new NetworkStream(defaultSocket, ownsSocket: true);
+						}
+						var socket = new Socket(ipv4.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+						await socket.ConnectAsync(new IPEndPoint(ipv4, context.DnsEndPoint.Port), cancellationToken);
+						return new NetworkStream(socket, ownsSocket: true);
+					}
+					catch (Exception ex)
+					{
+						MelonLogger.Error("[HTTP] ConnectCallback failed for " + context.DnsEndPoint.Host + ": " + ex.Message);
+						throw;
+					}
+				},
+				PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+				PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
+				MaxConnectionsPerServer = 10
+			};
+			var client = new HttpClient(handler);
+			client.Timeout = TimeSpan.FromSeconds(30);
+			MelonLogger.Msg("[HTTP] Shared API HttpClient created (IPv4-forcing, pooled connections)");
+			return client;
+		}
+		catch (Exception ex)
+		{
+			MelonLogger.Error("[HTTP] Failed to create shared HttpClient: " + ex.Message);
+			return new HttpClient();
+		}
+	}
+
 	public static bool isDownloading = false;
 
 	public static bool queueAvailable = false;
@@ -358,78 +409,42 @@ public class ModFileManager
 			{
 				try
 				{
-				using (var socketsHandler = new SocketsHttpHandler
-				{
-					SslOptions = new SslClientAuthenticationOptions
-					{
-						RemoteCertificateValidationCallback = (sender, cert, chain, errors) => true
-					},
-					ConnectCallback = async (context, cancellationToken) =>
-					{
-						try
-						{
-							var host = context.DnsEndPoint.Host;
-							var addresses = await Dns.GetHostEntryAsync(host);
-							var ipv4 = Array.Find(addresses.AddressList, a => a.AddressFamily == AddressFamily.InterNetwork);
-							if (ipv4 == null)
-							{
-								MelonLogger.Error("[HTTP] No IPv4 address found for " + host + " — using default connection");
-								var defaultSocket = new Socket(SocketType.Stream, ProtocolType.Tcp);
-								await defaultSocket.ConnectAsync(context.DnsEndPoint, cancellationToken);
-								return new NetworkStream(defaultSocket, ownsSocket: true);
-							}
-							var socket = new Socket(ipv4.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-							await socket.ConnectAsync(new IPEndPoint(ipv4, context.DnsEndPoint.Port), cancellationToken);
-							return new NetworkStream(socket, ownsSocket: true);
-						}
-						catch (Exception ex)
-						{
-							MelonLogger.Error("[HTTP] ConnectCallback failed for " + context.DnsEndPoint.Host + ": " + ex.Message);
-							throw;
-						}
-					}
-				})
-				{
-					using (HttpClient client = new HttpClient(socketsHandler))
-					{
-						client.DefaultRequestHeaders.Add("Authorization", "Bearer " + OAUTH_KEY);
-						client.Timeout = TimeSpan.FromSeconds(30);
+				sharedApiClient.DefaultRequestHeaders.Remove("Authorization");
+				sharedApiClient.DefaultRequestHeaders.Add("Authorization", "Bearer " + OAUTH_KEY);
 
-						HttpResponseMessage response = await client.GetAsync(url);
-						string responseText = await response.Content.ReadAsStringAsync();
+				HttpResponseMessage response = await sharedApiClient.GetAsync(url);
+				string responseText = await response.Content.ReadAsStringAsync();
 
-						if (response.IsSuccessStatusCode)
-						{
-							MainThreadManager.QueueAction(delegate
-							{
-								MainClass.subscriptionThreadString = responseText;
-								MelonLogger.Msg("[Subscription] QueueSubscriptions SUCCESS: code=" + (int)response.StatusCode + " body length=" + responseText.Length);
-								fetchingSubscriptions = false;
-							});
-						}
-						else
-						{
-							string errorText = "url=" + url + " code=" + (int)response.StatusCode + " body=" + (responseText.Length > 200 ? responseText.Substring(0, 200) + "..." : responseText);
-							MelonLogger.Error("[Subscription] QueueSubscriptions HTTP ERROR: " + errorText);
-							MainThreadManager.QueueAction(delegate
-							{
-								fetchingSubscriptions = false;
-								MainClass.HandleSubscriptionFailure();
-							});
-						}
-					}
-				}
-				}
-				catch (Exception ex)
+				if (response.IsSuccessStatusCode)
 				{
-					string errorText = "url=" + url + " error=" + ex.GetType().Name + ": " + ex.Message;
-					MelonLogger.Error("[Subscription] QueueSubscriptions FAILED: " + errorText);
+					MainThreadManager.QueueAction(delegate
+					{
+						MainClass.subscriptionThreadString = responseText;
+						MelonLogger.Msg("[Subscription] QueueSubscriptions SUCCESS: code=" + (int)response.StatusCode + " body length=" + responseText.Length);
+						fetchingSubscriptions = false;
+					});
+				}
+				else
+				{
+					string errorText = "url=" + url + " code=" + (int)response.StatusCode + " body=" + (responseText.Length > 200 ? responseText.Substring(0, 200) + "..." : responseText);
+					MelonLogger.Error("[Subscription] QueueSubscriptions HTTP ERROR: " + errorText);
 					MainThreadManager.QueueAction(delegate
 					{
 						fetchingSubscriptions = false;
 						MainClass.HandleSubscriptionFailure();
 					});
-				}
+			}
+			}
+			catch (Exception ex)
+			{
+				string errorText = "url=" + url + " error=" + ex.GetType().Name + ": " + ex.Message;
+				MelonLogger.Error("[Subscription] QueueSubscriptions FAILED: " + errorText);
+				MainThreadManager.QueueAction(delegate
+				{
+					fetchingSubscriptions = false;
+					MainClass.HandleSubscriptionFailure();
+				});
+			}
 			});
 		}
 		else
@@ -456,68 +471,35 @@ public class ModFileManager
 			{
 				try
 				{
-				using (var socketsHandler = new SocketsHttpHandler
-				{
-					SslOptions = new SslClientAuthenticationOptions
-					{
-						RemoteCertificateValidationCallback = (sender, cert, chain, errors) => true
-					},
-					ConnectCallback = async (context, cancellationToken) =>
-					{
-						try
-						{
-							var host = context.DnsEndPoint.Host;
-							var addresses = await Dns.GetHostEntryAsync(host);
-							var ipv4 = Array.Find(addresses.AddressList, a => a.AddressFamily == AddressFamily.InterNetwork);
-							if (ipv4 == null)
-							{
-								MelonLogger.Error("[HTTP] No IPv4 address found for " + host + " — using default connection");
-								var defaultSocket = new Socket(SocketType.Stream, ProtocolType.Tcp);
-								await defaultSocket.ConnectAsync(context.DnsEndPoint, cancellationToken);
-								return new NetworkStream(defaultSocket, ownsSocket: true);
-							}
-							var socket = new Socket(ipv4.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-							await socket.ConnectAsync(new IPEndPoint(ipv4, context.DnsEndPoint.Port), cancellationToken);
-							return new NetworkStream(socket, ownsSocket: true);
-						}
-						catch (Exception ex)
-						{
-							MelonLogger.Error("[HTTP] ConnectCallback failed for " + context.DnsEndPoint.Host + ": " + ex.Message);
-							throw;
-						}
-					}
-				})
-				{
-					using (HttpClient client = new HttpClient(socketsHandler))
-					{
-						client.DefaultRequestHeaders.Add("Authorization", "Bearer " + OAUTH_KEY);
-						client.DefaultRequestHeaders.Add("Accept", "application/json");
-						client.DefaultRequestHeaders.Add("X-Modio-Platform", "windows");
-						client.DefaultRequestHeaders.Add("X-Modio-Portal", "steam");
-						client.Timeout = TimeSpan.FromSeconds(30);
+				sharedApiClient.DefaultRequestHeaders.Remove("Authorization");
+				sharedApiClient.DefaultRequestHeaders.Add("Authorization", "Bearer " + OAUTH_KEY);
+				sharedApiClient.DefaultRequestHeaders.Remove("Accept");
+				sharedApiClient.DefaultRequestHeaders.Add("Accept", "application/json");
+				sharedApiClient.DefaultRequestHeaders.Remove("X-Modio-Platform");
+				sharedApiClient.DefaultRequestHeaders.Add("X-Modio-Platform", "windows");
+				sharedApiClient.DefaultRequestHeaders.Remove("X-Modio-Portal");
+				sharedApiClient.DefaultRequestHeaders.Add("X-Modio-Portal", "steam");
 
-						HttpResponseMessage response = await client.GetAsync(url);
-						string responseText = await response.Content.ReadAsStringAsync();
+				HttpResponseMessage response = await sharedApiClient.GetAsync(url);
+				string responseText = await response.Content.ReadAsStringAsync();
 
-						if (response.IsSuccessStatusCode)
-						{
-							MainThreadManager.QueueAction(delegate
-							{
-								MainClass.trendingThreadString = responseText;
-								MelonLogger.Msg("[Trending] QueueTrending SUCCESS: code=" + (int)response.StatusCode);
-								fetchingTrending = false;
-							});
-						}
-						else
-						{
-							string bodyPreview = responseText.Length > 100 ? responseText.Substring(0, 100) + "..." : responseText;
-							MelonLogger.Error("[Trending] QueueTrending HTTP ERROR: url=" + url + " code=" + (int)response.StatusCode + " body=" + bodyPreview);
-							MainThreadManager.QueueAction(delegate
-							{
-								fetchingTrending = false;
-							});
-						}
-					}
+				if (response.IsSuccessStatusCode)
+				{
+					MainThreadManager.QueueAction(delegate
+					{
+						MainClass.trendingThreadString = responseText;
+						MelonLogger.Msg("[Trending] QueueTrending SUCCESS: code=" + (int)response.StatusCode);
+						fetchingTrending = false;
+					});
+				}
+				else
+				{
+					string bodyPreview = responseText.Length > 100 ? responseText.Substring(0, 100) + "..." : responseText;
+					MelonLogger.Error("[Trending] QueueTrending HTTP ERROR: url=" + url + " code=" + (int)response.StatusCode + " body=" + bodyPreview);
+					MainThreadManager.QueueAction(delegate
+					{
+						fetchingTrending = false;
+					});
 				}
 				}
 				catch (Exception ex)
@@ -541,70 +523,34 @@ public class ModFileManager
 		{
 			try
 			{
-				using (var socketsHandler = new SocketsHttpHandler
-				{
-					SslOptions = new SslClientAuthenticationOptions
-					{
-						RemoteCertificateValidationCallback = (sender, cert, chain, errors) => true
-					},
-					ConnectCallback = async (context, cancellationToken) =>
-					{
-						try
-						{
-							var host = context.DnsEndPoint.Host;
-							var addresses = await Dns.GetHostEntryAsync(host);
-							var ipv4 = Array.Find(addresses.AddressList, a => a.AddressFamily == AddressFamily.InterNetwork);
-							if (ipv4 == null)
-							{
-								MelonLogger.Error("[HTTP] No IPv4 address found for " + host + " — using default connection");
-								var defaultSocket = new Socket(SocketType.Stream, ProtocolType.Tcp);
-								await defaultSocket.ConnectAsync(context.DnsEndPoint, cancellationToken);
-								return new NetworkStream(defaultSocket, ownsSocket: true);
-							}
-							var socket = new Socket(ipv4.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-							await socket.ConnectAsync(new IPEndPoint(ipv4, context.DnsEndPoint.Port), cancellationToken);
-							return new NetworkStream(socket, ownsSocket: true);
-						}
-						catch (Exception ex)
-						{
-							MelonLogger.Error("[HTTP] ConnectCallback failed for " + context.DnsEndPoint.Host + ": " + ex.Message);
-							throw;
-						}
-					}
-				})
-				{
-					using (HttpClient client = new HttpClient(socketsHandler))
-					{
-						client.DefaultRequestHeaders.Add("Authorization", "Bearer " + OAUTH_KEY);
-						client.Timeout = TimeSpan.FromSeconds(30);
+				sharedApiClient.DefaultRequestHeaders.Remove("Authorization");
+				sharedApiClient.DefaultRequestHeaders.Add("Authorization", "Bearer " + OAUTH_KEY);
 
-						var content = new StringContent("", Encoding.UTF8, "application/x-www-form-urlencoded");
-						HttpResponseMessage response = await client.PostAsync(url, content);
-						string responseBody = await response.Content.ReadAsStringAsync();
-						int statusCode = (int)response.StatusCode;
+				var content = new FormUrlEncodedContent(new Dictionary<string, string>());
+				HttpResponseMessage response = await sharedApiClient.PostAsync(url, content);
+				string responseBody = await response.Content.ReadAsStringAsync();
+				int statusCode = (int)response.StatusCode;
 
-						if (statusCode == 200 || statusCode == 201)
+				if (statusCode == 200 || statusCode == 201)
+				{
+					MelonLogger.Msg("[Subscribe] SUCCESS: code=" + statusCode + " for mod " + numericalid);
+					MainThreadManager.QueueAction(delegate
+					{
+						// Add to local subscribed list so UI updates immediately
+						if (!MainClass.subscribedModIoNumericalIds.Contains(numericalid))
 						{
-							MelonLogger.Msg("[Subscribe] SUCCESS: code=" + statusCode + " for mod " + numericalid);
-							MainThreadManager.QueueAction(delegate
-							{
-								// Add to local subscribed list so UI updates immediately
-								if (!MainClass.subscribedModIoNumericalIds.Contains(numericalid))
-								{
-									MainClass.subscribedModIoNumericalIds.Add(numericalid);
-									MelonLogger.Msg("[Subscribe] Added " + numericalid + " to subscribedModIoNumericalIds");
-								}
-								if ((UnityEngine.Object)(object)NetworkerMenuController.instance != null)
-								{
-									NetworkerMenuController.instance.UpdateModPopupButtons();
-								}
-							});
+							MainClass.subscribedModIoNumericalIds.Add(numericalid);
+							MelonLogger.Msg("[Subscribe] Added " + numericalid + " to subscribedModIoNumericalIds");
 						}
-						else
+						if ((UnityEngine.Object)(object)NetworkerMenuController.instance != null)
 						{
-							MelonLogger.Error("[Subscribe] FAILED: code=" + statusCode + " body=" + (responseBody.Length > 200 ? responseBody.Substring(0, 200) + "..." : responseBody) + " for mod " + numericalid);
+							NetworkerMenuController.instance.UpdateModPopupButtons();
 						}
-					}
+					});
+				}
+				else
+				{
+					MelonLogger.Error("[Subscribe] FAILED: code=" + statusCode + " body=" + (responseBody.Length > 200 ? responseBody.Substring(0, 200) + "..." : responseBody) + " for mod " + numericalid);
 				}
 			}
 			catch (Exception ex)
@@ -629,67 +575,33 @@ public class ModFileManager
 		{
 			try
 			{
-				using (var socketsHandler = new SocketsHttpHandler
+				sharedApiClient.DefaultRequestHeaders.Remove("Authorization");
+				sharedApiClient.DefaultRequestHeaders.Add("Authorization", "Bearer " + OAUTH_KEY);
+
+				// Must use HttpRequestMessage to set Content-Type on DELETE requests
+				var request = new HttpRequestMessage(HttpMethod.Delete, url);
+				request.Content = new FormUrlEncodedContent(new Dictionary<string, string>());
+				HttpResponseMessage response = await sharedApiClient.SendAsync(request);
+				string responseBody = await response.Content.ReadAsStringAsync();
+				int statusCode = (int)response.StatusCode;
+
+				if (statusCode == 204)
 				{
-					SslOptions = new SslClientAuthenticationOptions
+					MelonLogger.Msg("[UnSubscribe] SUCCESS: code=" + statusCode + " for mod " + numericalId);
+					MainThreadManager.QueueAction(delegate
 					{
-						RemoteCertificateValidationCallback = (sender, cert, chain, errors) => true
-					},
-					ConnectCallback = async (context, cancellationToken) =>
-					{
-						try
+						MainClass.subscribedModIoNumericalIds.Remove(numericalId);
+						MelonLogger.Msg("[UnSubscribe] Removed " + numericalId + " from subscribedModIoNumericalIds");
+
+						if ((UnityEngine.Object)(object)NetworkerMenuController.instance != null)
 						{
-							var host = context.DnsEndPoint.Host;
-							var addresses = await Dns.GetHostEntryAsync(host);
-							var ipv4 = Array.Find(addresses.AddressList, a => a.AddressFamily == AddressFamily.InterNetwork);
-							if (ipv4 == null)
-							{
-								MelonLogger.Error("[HTTP] No IPv4 address found for " + host + " — using default connection");
-								var defaultSocket = new Socket(SocketType.Stream, ProtocolType.Tcp);
-								await defaultSocket.ConnectAsync(context.DnsEndPoint, cancellationToken);
-								return new NetworkStream(defaultSocket, ownsSocket: true);
-							}
-							var socket = new Socket(ipv4.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-							await socket.ConnectAsync(new IPEndPoint(ipv4, context.DnsEndPoint.Port), cancellationToken);
-							return new NetworkStream(socket, ownsSocket: true);
+							NetworkerMenuController.instance.UpdateModPopupButtons();
 						}
-						catch (Exception ex)
-						{
-							MelonLogger.Error("[HTTP] ConnectCallback failed for " + context.DnsEndPoint.Host + ": " + ex.Message);
-							throw;
-						}
-					}
-				})
+					});
+				}
+				else
 				{
-					using (HttpClient client = new HttpClient(socketsHandler))
-					{
-						client.DefaultRequestHeaders.Add("Authorization", "Bearer " + OAUTH_KEY);
-						client.DefaultRequestHeaders.Add("Content-Type", "application/x-www-form-urlencoded");
-						client.Timeout = TimeSpan.FromSeconds(30);
-
-						HttpResponseMessage response = await client.DeleteAsync(url);
-						string responseBody = await response.Content.ReadAsStringAsync();
-						int statusCode = (int)response.StatusCode;
-
-						if (statusCode == 204)
-						{
-							MelonLogger.Msg("[UnSubscribe] SUCCESS: code=" + statusCode + " for mod " + numericalId);
-							MainThreadManager.QueueAction(delegate
-							{
-								MainClass.subscribedModIoNumericalIds.Remove(numericalId);
-								MelonLogger.Msg("[UnSubscribe] Removed " + numericalId + " from subscribedModIoNumericalIds");
-
-								if ((UnityEngine.Object)(object)NetworkerMenuController.instance != null)
-								{
-									NetworkerMenuController.instance.UpdateModPopupButtons();
-								}
-							});
-						}
-						else
-						{
-							MelonLogger.Error("[UnSubscribe] FAILED: code=" + statusCode + " body=" + (responseBody.Length > 200 ? responseBody.Substring(0, 200) + "..." : responseBody) + " for mod " + numericalId);
-						}
-					}
+					MelonLogger.Error("[UnSubscribe] FAILED: code=" + statusCode + " body=" + (responseBody.Length > 200 ? responseBody.Substring(0, 200) + "..." : responseBody) + " for mod " + numericalId);
 				}
 			}
 			catch (Exception ex)
