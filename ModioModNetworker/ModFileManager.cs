@@ -468,34 +468,56 @@ public class ModFileManager
 		}
 	}
 
-	public static bool Subscribe(string numericalid)
+	public static void Subscribe(string numericalid)
 	{
-		string text = "https://mod.io/v1/games/3809/mods/" + numericalid + "/subscribe";
-		UnityWebRequest httpWebRequest = UnityWebRequest.Get(text);
-		httpWebRequest.method = "POST";
-		httpWebRequest.SetRequestHeader("Authorization", "Bearer " + OAUTH_KEY);
-		httpWebRequest.SetRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-		UnityWebRequestAsyncOperation val = httpWebRequest.SendWebRequest();
-		((AsyncOperation)val).m_completeCallback = ((AsyncOperation)val).m_completeCallback + new Action<AsyncOperation>(delegate
+		string url = "https://mod.io/v1/games/3809/mods/" + numericalid + "/subscribe";
+		MelonLogger.Msg("[Subscribe] Requesting: POST " + url);
+
+		System.Threading.Tasks.Task.Run(async delegate
 		{
-			if (httpWebRequest.responseCode == 201L || httpWebRequest.responseCode == 200L)
+			try
 			{
-				MelonLogger.Msg("[Subscribe] Successfully subscribed to mod " + numericalid);
-				MainThreadManager.QueueAction(delegate
+				using (HttpClientHandler handler = new HttpClientHandler())
 				{
-					if ((UnityEngine.Object)(object)NetworkerMenuController.instance != null)
+					handler.ServerCertificateCustomValidationCallback = (sender, cert, chain, errors) => true;
+					using (HttpClient client = new HttpClient(handler))
 					{
-						NetworkerMenuController.instance.UpdateModPopupButtons();
+						client.DefaultRequestHeaders.Add("Authorization", "Bearer " + OAUTH_KEY);
+						client.Timeout = TimeSpan.FromSeconds(30);
+
+						HttpResponseMessage response = await client.PostAsync(url, null);
+						string responseBody = await response.Content.ReadAsStringAsync();
+						int statusCode = (int)response.StatusCode;
+
+						if (statusCode == 200 || statusCode == 201)
+						{
+							MelonLogger.Msg("[Subscribe] SUCCESS: code=" + statusCode + " for mod " + numericalid);
+							MainThreadManager.QueueAction(delegate
+							{
+								// Add to local subscribed list so UI updates immediately
+								if (!MainClass.subscribedModIoNumericalIds.Contains(numericalid))
+								{
+									MainClass.subscribedModIoNumericalIds.Add(numericalid);
+									MelonLogger.Msg("[Subscribe] Added " + numericalid + " to subscribedModIoNumericalIds");
+								}
+								if ((UnityEngine.Object)(object)NetworkerMenuController.instance != null)
+								{
+									NetworkerMenuController.instance.UpdateModPopupButtons();
+								}
+							});
+						}
+						else
+						{
+							MelonLogger.Error("[Subscribe] FAILED: code=" + statusCode + " body=" + (responseBody.Length > 200 ? responseBody.Substring(0, 200) + "..." : responseBody) + " for mod " + numericalid);
+						}
 					}
-				});
+				}
 			}
-			else
+			catch (Exception ex)
 			{
-				MelonLogger.Error("[Subscribe] Failed to subscribe to mod " + numericalid + ": responseCode=" + httpWebRequest.responseCode + " error=" + (httpWebRequest.error ?? "none"));
+				MelonLogger.Error("[Subscribe] Exception for mod " + numericalid + ": " + ex.GetType().Name + ": " + ex.Message);
 			}
 		});
-
-		return false;
 	}
 
 	public static void UninstallAndUnsubscribe(string modId)
@@ -506,32 +528,51 @@ public class ModFileManager
 
 	public static void UnSubscribe(string numericalId)
 	{
-		string text = "https://mod.io/v1/games/3809/mods/" + numericalId + "/subscribe";
-		UnityWebRequest val = UnityWebRequest.Get(text);
-		val.method = "DELETE";
-		val.SetRequestHeader("Authorization", "Bearer " + OAUTH_KEY);
-		val.SetRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-		UnityWebRequestAsyncOperation val2 = val.SendWebRequest();
-		((AsyncOperation)val2).m_completeCallback = ((AsyncOperation)val2).m_completeCallback + new Action<AsyncOperation>(delegate
+		string url = "https://mod.io/v1/games/3809/mods/" + numericalId + "/subscribe";
+		MelonLogger.Msg("[UnSubscribe] Requesting: DELETE " + url);
+
+		System.Threading.Tasks.Task.Run(async delegate
 		{
-			if (val.responseCode == 204L)
+			try
 			{
-				MelonLogger.Msg("[Subscribe] Successfully unsubscribed from mod " + numericalId);
-				MainThreadManager.QueueAction(delegate
+				using (HttpClientHandler handler = new HttpClientHandler())
 				{
-					if ((UnityEngine.Object)(object)NetworkerMenuController.instance != null)
+					handler.ServerCertificateCustomValidationCallback = (sender, cert, chain, errors) => true;
+					using (HttpClient client = new HttpClient(handler))
 					{
-						MainClass.subscribedModIoNumericalIds.Remove(numericalId);
-						NetworkerMenuController.instance.UpdateModPopupButtons();
+						client.DefaultRequestHeaders.Add("Authorization", "Bearer " + OAUTH_KEY);
+						client.Timeout = TimeSpan.FromSeconds(30);
+
+						HttpResponseMessage response = await client.DeleteAsync(url);
+						string responseBody = await response.Content.ReadAsStringAsync();
+						int statusCode = (int)response.StatusCode;
+
+						if (statusCode == 204)
+						{
+							MelonLogger.Msg("[UnSubscribe] SUCCESS: code=" + statusCode + " for mod " + numericalId);
+							MainThreadManager.QueueAction(delegate
+							{
+								MainClass.subscribedModIoNumericalIds.Remove(numericalId);
+								MelonLogger.Msg("[UnSubscribe] Removed " + numericalId + " from subscribedModIoNumericalIds");
+
+								if ((UnityEngine.Object)(object)NetworkerMenuController.instance != null)
+								{
+									NetworkerMenuController.instance.UpdateModPopupButtons();
+								}
+							});
+						}
+						else
+						{
+							MelonLogger.Error("[UnSubscribe] FAILED: code=" + statusCode + " body=" + (responseBody.Length > 200 ? responseBody.Substring(0, 200) + "..." : responseBody) + " for mod " + numericalId);
+						}
 					}
-				});
+				}
 			}
-			else
+			catch (Exception ex)
 			{
-				MelonLogger.Error("[Subscribe] Failed to unsubscribe from mod " + numericalId + ": responseCode=" + val.responseCode + " error=" + (val.error ?? "none"));
+				MelonLogger.Error("[UnSubscribe] Exception for mod " + numericalId + ": " + ex.GetType().Name + ": " + ex.Message);
 			}
 		});
-
 	}
 
 	public static void UnInstallMainThread(string numericalId)

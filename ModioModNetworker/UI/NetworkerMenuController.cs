@@ -261,6 +261,9 @@ public class NetworkerMenuController : MonoBehaviour
 
 		// SUBSCRIBE path
 		MelonLogger.Msg("[Button] SUBSCRIBE path — numericalId=" + (viewedInfo?.numericalId ?? "null"));
+		MelonLogger.Msg("[Button] Calling Subscribe API for " + (viewedInfo?.numericalId ?? "null"));
+		ModFileManager.Subscribe(viewedInfo.numericalId);
+
 		if (viewedInfo.windowsDownloadLink != "nothing" || viewedInfo.androidDownloadLink != "nothing")
 		{
 			MelonLogger.Msg("[Button] Has download links — calling ReceiveSubModInfo");
@@ -273,11 +276,9 @@ public class NetworkerMenuController : MonoBehaviour
 		}
 		if (!MainClass.subscribedModIoNumericalIds.Contains(viewedInfo.numericalId))
 		{
+			MelonLogger.Msg("[Button] Adding to subscribedModIoNumericalIds: " + (viewedInfo?.numericalId ?? "null"));
 			MainClass.subscribedModIoNumericalIds.Add(viewedInfo.numericalId);
-			MelonLogger.Msg("[Button] Added to subscribedModIoNumericalIds: " + (viewedInfo?.numericalId ?? "null"));
 		}
-		MelonLogger.Msg("[Button] Calling Subscribe for numericalId=" + (viewedInfo?.numericalId ?? "null"));
-		ModFileManager.Subscribe(viewedInfo.numericalId);
 	}
 
 	private void Search(string query)
