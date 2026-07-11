@@ -340,33 +340,66 @@ public class ModFileManager
 		}
 	}
 
-		public static void QueueSubscriptions(int shown)
+	public static void QueueSubscriptions(int shown)
 	{
 		if (!fetchingSubscriptions)
 		{
 			fetchingSubscriptions = true;
-			UnityWebRequest httpWebRequest = UnityWebRequest.Get("https://mod.io/v1/me/subscribed?_offset=" + shown + "&limit=400&game_id=3809");
-			httpWebRequest.SetRequestHeader("Authorization", "Bearer " + OAUTH_KEY);
-			httpWebRequest.SetRequestHeader("X-Modio-Platform", "windows");
-			httpWebRequest.SetRequestHeader("X-Modio-Portal", "steam");
-			MelonLogger.Msg("QueueSubscriptions: Requesting URL: " + "https://mod.io/v1/me/subscribed?_offset=" + shown + "&limit=400&game_id=3809");
-			UnityWebRequestAsyncOperation val = httpWebRequest.SendWebRequest();
-		((AsyncOperation)val).m_completeCallback = ((AsyncOperation)val).m_completeCallback + new Action<AsyncOperation>(delegate
-		{
-			if (httpWebRequest.result != UnityWebRequest.Result.Success)
-			{
-				string errorText = (httpWebRequest.downloadHandler != null && !string.IsNullOrEmpty(httpWebRequest.downloadHandler.text)) ? httpWebRequest.downloadHandler.text : "(no response body)";
-				MelonLogger.Error("QueueSubscriptions FAILED: url=" + httpWebRequest.url + " result=" + httpWebRequest.result + " code=" + httpWebRequest.responseCode + " error=" + httpWebRequest.error + " body=" + (errorText.Length > 200 ? errorText.Substring(0, 200) : errorText));
-				fetchingSubscriptions = false;
-				MainClass.HandleSubscriptionFailure();
-				return;
-			}
-			string responseText = httpWebRequest.downloadHandler.text;
-			MelonLogger.Msg("QueueSubscriptions SUCCESS: url=" + httpWebRequest.url + " code=" + httpWebRequest.responseCode + " body=" + (responseText.Length > 200 ? responseText.Substring(0, 200) : responseText));
-			MainClass.subscriptionThreadString = responseText;
-			fetchingSubscriptions = false;
-		});
+			string url = "https://mod.io/v1/me/subscribed?_offset=" + shown + "&limit=400&game_id=3809";
+			MelonLogger.Msg("[Subscription] QueueSubscriptions: Requesting URL: " + url);
 
+			System.Threading.Tasks.Task.Run(async delegate
+			{
+				try
+				{
+					using (HttpClientHandler handler = new HttpClientHandler())
+					{
+						handler.ServerCertificateCustomValidationCallback = (sender, cert, chain, errors) => true;
+						using (HttpClient client = new HttpClient(handler))
+						{
+							client.DefaultRequestHeaders.Add("Authorization", "Bearer " + OAUTH_KEY);
+							client.Timeout = TimeSpan.FromSeconds(30);
+
+							HttpResponseMessage response = await client.GetAsync(url);
+							string responseText = await response.Content.ReadAsStringAsync();
+
+							if (response.IsSuccessStatusCode)
+							{
+								MainThreadManager.QueueAction(delegate
+								{
+									MainClass.subscriptionThreadString = responseText;
+									MelonLogger.Msg("[Subscription] QueueSubscriptions SUCCESS: code=" + (int)response.StatusCode + " body length=" + responseText.Length);
+									fetchingSubscriptions = false;
+								});
+							}
+							else
+							{
+								string errorText = "url=" + url + " code=" + (int)response.StatusCode + " body=" + (responseText.Length > 200 ? responseText.Substring(0, 200) + "..." : responseText);
+								MelonLogger.Error("[Subscription] QueueSubscriptions HTTP ERROR: " + errorText);
+								MainThreadManager.QueueAction(delegate
+								{
+									fetchingSubscriptions = false;
+									MainClass.HandleSubscriptionFailure();
+								});
+							}
+						}
+					}
+				}
+				catch (Exception ex)
+				{
+					string errorText = "url=" + url + " error=" + ex.GetType().Name + ": " + ex.Message;
+					MelonLogger.Error("[Subscription] QueueSubscriptions FAILED: " + errorText);
+					MainThreadManager.QueueAction(delegate
+					{
+						fetchingSubscriptions = false;
+						MainClass.HandleSubscriptionFailure();
+					});
+				}
+			});
+		}
+		else
+		{
+			MelonLogger.Warning("[Subscription] QueueSubscriptions skipped — already fetching");
 		}
 	}
 
@@ -381,17 +414,57 @@ public class ModFileManager
 				text = "";
 			}
 			SpotlightOverride.LoadFromRegularURL();
-			UnityWebRequest httpWebRequest = UnityWebRequest.Get($"https://mod.io/v1/games/@bonelab/mods?_limit=100&_offset={offset}&_sort=-popular" + text);
-			httpWebRequest.SetRequestHeader("Authorization", "Bearer " + OAUTH_KEY);
-			httpWebRequest.SetRequestHeader("X-Modio-Platform", "windows");
-			httpWebRequest.SetRequestHeader("X-Modio-Portal", "steam");
-			UnityWebRequestAsyncOperation val = httpWebRequest.SendWebRequest();
-		((AsyncOperation)val).m_completeCallback = ((AsyncOperation)val).m_completeCallback + new Action<AsyncOperation>(delegate
-		{
-			MainClass.trendingThreadString = httpWebRequest.downloadHandler.text;
-			fetchingTrending = false;
-		});
+			string url = $"https://mod.io/v1/games/@bonelab/mods?_limit=100&_offset={offset}&_sort=-popular" + text;
+			MelonLogger.Msg("[Trending] QueueTrending: Requesting URL: " + url);
 
+			System.Threading.Tasks.Task.Run(async delegate
+			{
+				try
+				{
+					using (HttpClientHandler handler = new HttpClientHandler())
+					{
+						handler.ServerCertificateCustomValidationCallback = (sender, cert, chain, errors) => true;
+						using (HttpClient client = new HttpClient(handler))
+						{
+							client.DefaultRequestHeaders.Add("Authorization", "Bearer " + OAUTH_KEY);
+							client.DefaultRequestHeaders.Add("Accept", "application/json");
+							client.DefaultRequestHeaders.Add("X-Modio-Platform", "windows");
+							client.DefaultRequestHeaders.Add("X-Modio-Portal", "steam");
+							client.Timeout = TimeSpan.FromSeconds(30);
+
+							HttpResponseMessage response = await client.GetAsync(url);
+							string responseText = await response.Content.ReadAsStringAsync();
+
+							if (response.IsSuccessStatusCode)
+							{
+								MainThreadManager.QueueAction(delegate
+								{
+									MainClass.trendingThreadString = responseText;
+									MelonLogger.Msg("[Trending] QueueTrending SUCCESS: code=" + (int)response.StatusCode);
+									fetchingTrending = false;
+								});
+							}
+							else
+							{
+								string bodyPreview = responseText.Length > 100 ? responseText.Substring(0, 100) + "..." : responseText;
+								MelonLogger.Error("[Trending] QueueTrending HTTP ERROR: url=" + url + " code=" + (int)response.StatusCode + " body=" + bodyPreview);
+								MainThreadManager.QueueAction(delegate
+								{
+									fetchingTrending = false;
+								});
+							}
+						}
+					}
+				}
+				catch (Exception ex)
+				{
+					MelonLogger.Error("[Trending] QueueTrending FAILED: url=" + url + " error=" + ex.GetType().Name + ": " + ex.Message);
+					MainThreadManager.QueueAction(delegate
+					{
+						fetchingTrending = false;
+					});
+				}
+			});
 		}
 	}
 
@@ -543,6 +616,7 @@ public class ModFileManager
 
 	public static void UnInstall(string numericalId)
 	{
+		MelonLogger.Msg("[UnInstall] Called for numericalId=" + numericalId);
 		InstalledModInfo installedModInfo = null;
 		foreach (InstalledModInfo installedModInfo2 in MainClass.InstalledModInfos)
 		{
@@ -553,23 +627,32 @@ public class ModFileManager
 		}
 		Thread thread = new Thread((ThreadStart)delegate
 		{
+			MelonLogger.Msg("[UnInstall] Background thread started for numericalId=" + numericalId);
 			try
 			{
 				if (installedModInfo != null)
 				{
 					string barcode = installedModInfo.palletBarcode;
+					MelonLogger.Msg("[UnInstall] Found installedModInfo for numericalId=" + numericalId + " barcode=" + barcode);
 					MainThreadManager.QueueAction(delegate
 					{
 						UnloadPallet(barcode);
 					});
+					MelonLogger.Msg("[UnInstall] Deleting manifest: " + installedModInfo.manifestPath);
 					File.Delete(installedModInfo.manifestPath);
 					string fullName = Directory.GetParent(installedModInfo.catalogPath).FullName;
+					MelonLogger.Msg("[UnInstall] Deleting directory: " + fullName);
 					Directory.Delete(fullName, recursive: true);
+					MelonLogger.Msg("[UnInstall] Successfully uninstalled numericalId=" + numericalId);
+				}
+				else
+				{
+					MelonLogger.Warning("[UnInstall] No InstalledModInfo found for numericalId=" + numericalId + " — nothing to delete");
 				}
 			}
 			catch (Exception ex)
 			{
-				MelonLogger.Error("Exception when uninstalling mod: " + ex);
+				MelonLogger.Error("[UnInstall] Exception when uninstalling mod " + numericalId + ": " + ex);
 			}
 			MainClass.RequestInstallCheck();
 		});
