@@ -14,7 +14,7 @@ namespace ModioModNetworker.UI;
 public class ThumbnailThreader
 {
     private static ConcurrentQueue<ThumbnailCompletionJob> thumbnailCompletionJobs = new ConcurrentQueue<ThumbnailCompletionJob>();
-    private static HashSet<string> downloadedThumbnailUrls = new HashSet<string>();
+    private static Dictionary<string, Texture> thumbnailTextureCache = new Dictionary<string, Texture>();
     private static readonly object thumbnailCacheLock = new object();
 
     private static HttpClient CreateIPv4HttpClient()
@@ -68,14 +68,15 @@ public class ThumbnailThreader
             return;
         }
 
+        // Check texture cache first
         lock (thumbnailCacheLock)
         {
-            if (downloadedThumbnailUrls.Contains(url))
+            if (thumbnailTextureCache.TryGetValue(url, out Texture cachedTexture))
             {
-                MelonLogger.Msg("[ThumbnailThreader] Skipping already-downloaded thumbnail: " + url);
+                MelonLogger.Msg("[ThumbnailThreader] Using cached texture for " + url);
+                action(cachedTexture);
                 return;
             }
-            downloadedThumbnailUrls.Add(url);
         }
 
         MelonLogger.Msg("[ThumbnailThreader] Starting download for " + url);
@@ -139,6 +140,12 @@ public class ThumbnailThreader
                     if (ImageConversion.LoadImage(texture, capturedBytes))
                     {
                         MelonLogger.Msg("[ThumbnailThreader] Success — created " + texture.width + "x" + texture.height + " texture via " + capturedMethod + " from " + capturedBytes.Length + " bytes");
+                        // Cache the texture for future re-use
+                        lock (thumbnailCacheLock)
+                        {
+                            thumbnailTextureCache[url] = texture;
+                            MelonLogger.Msg("[ThumbnailThreader] Cached texture for " + url + " (cache size: " + thumbnailTextureCache.Count + ")");
+                        }
                         action(texture);
                     }
                     else
