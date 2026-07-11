@@ -945,6 +945,126 @@ public class MainClass : MelonMod
 				installedModInfo.ModInfo = modInfo;
 				InstalledModInfo item = installedModInfo;
 				InstalledModInfos.Add(item);
+
+				// Check if manifest is missing any required structure (1, 2, 3, 4, or targets/data)
+				try
+				{
+					bool needsEnrichment = false;
+					string enrichReason = "";
+					
+					// Check if objects["2"] targets are empty
+					var targets2 = val["objects"]["2"]["targets"];
+					bool hasPcTarget = false;
+					bool hasAndroidTarget = false;
+					try { hasPcTarget = targets2["pc"] != null; } catch { }
+					try { hasAndroidTarget = targets2["android"] != null; } catch { }
+					
+					if (!hasPcTarget && !hasAndroidTarget)
+					{
+						needsEnrichment = true;
+						enrichReason = "targets are empty";
+					}
+					
+					// If targets exist, check the referenced target objects (3, 4)
+					if (!needsEnrichment)
+					{
+						// Check PC target object
+						if (hasPcTarget)
+						{
+							try
+							{
+								int pcRef = (int)targets2["pc"]["ref"];
+								var pcObj = val["objects"][pcRef.ToString()];
+								if (pcObj == null) { needsEnrichment = true; enrichReason = "PC target object (ref " + pcRef + ") missing"; }
+								else
+								{
+									bool pcHasModId = false;
+									bool pcHasModfileId = false;
+									try { pcHasModId = (int)pcObj["modId"] != 0; } catch { }
+									try { pcHasModfileId = (int)pcObj["modfileId"] != 0; } catch { }
+									if (!pcHasModId || !pcHasModfileId) { needsEnrichment = true; enrichReason = "PC target missing modId/modfileId"; }
+								}
+							}
+							catch { needsEnrichment = true; enrichReason = "PC target ref resolution failed"; }
+						}
+						
+						// Check Android target object
+						if (hasAndroidTarget && !needsEnrichment)
+						{
+							try
+							{
+								int androidRef = (int)targets2["android"]["ref"];
+								var androidObj = val["objects"][androidRef.ToString()];
+								if (androidObj == null) { needsEnrichment = true; enrichReason = "Android target object (ref " + androidRef + ") missing"; }
+								else
+								{
+									bool androidHasModId = false;
+									bool androidHasModfileId = false;
+									try { androidHasModId = (int)androidObj["modId"] != 0; } catch { }
+									try { androidHasModfileId = (int)androidObj["modfileId"] != 0; } catch { }
+									if (!androidHasModId || !androidHasModfileId) { needsEnrichment = true; enrichReason = "Android target missing modId/modfileId"; }
+								}
+							}
+							catch { needsEnrichment = true; enrichReason = "Android target ref resolution failed"; }
+						}
+						
+						// Even if targets exist, check that objects["3"] and ["4"] are actually present
+						if (!needsEnrichment)
+						{
+							bool hasObj3 = false;
+							bool hasObj4 = false;
+							try { hasObj3 = val["objects"]["3"] != null; } catch { }
+							try { hasObj4 = val["objects"]["4"] != null; } catch { }
+							if (!hasObj3) { needsEnrichment = true; enrichReason = "objects[\"3\"] missing"; }
+							else if (!hasObj4) { needsEnrichment = true; enrichReason = "objects[\"4\"] missing"; }
+						}
+					}
+					
+					if (needsEnrichment)
+					{
+						MelonLogger.Msg("[ManifestEnrichment] Manifest " + Path.GetFileName(text) + " needs enrichment: " + enrichReason);
+						
+						string manifestFilePath = text;
+						string modFolderPath = manifestFilePath.EndsWith(".manifest")
+							? manifestFilePath.Substring(0, manifestFilePath.Length - ".manifest".Length)
+							: "";
+						string modInfoPath = System.IO.Path.Combine(modFolderPath, "modinfo.json");
+						
+						if (File.Exists(modInfoPath))
+						{
+							string modInfoJson2 = File.ReadAllText(modInfoPath);
+							ModInfo modInfoFromFile2 = JsonConvert.DeserializeObject<ModInfo>(modInfoJson2, new JsonSerializerSettings
+							{
+								MissingMemberHandling = MissingMemberHandling.Ignore,
+								Error = (sender, args) => args.ErrorContext.Handled = true
+							});
+							
+							if (modInfoFromFile2 != null && !string.IsNullOrEmpty(modInfoFromFile2.numericalId))
+							{
+								string barcode2 = "";
+								if (val != null && val["objects"] != null && val["objects"]["1"] != null)
+								{
+									barcode2 = (string)val["objects"]["1"]["palletBarcode"];
+								}
+								deferredEnrichmentQueue.Enqueue(modInfoFromFile2);
+								deferredEnrichmentBarcodes.Add(barcode2);
+								MelonLogger.Msg("[ManifestEnrichment] Queued " + (modInfoFromFile2.modName ?? barcode2) + " for enrichment (reason: " + enrichReason + ", queue size: " + deferredEnrichmentQueue.Count + ")");
+							}
+							else
+							{
+								MelonLogger.Warning("[ManifestEnrichment] Cannot enrich " + Path.GetFileName(text) + " — modinfo.json missing numericalId (reason: " + enrichReason + ")");
+							}
+						}
+						else
+						{
+							MelonLogger.Warning("[ManifestEnrichment] Cannot enrich " + Path.GetFileName(text) + " — no modinfo.json (reason: " + enrichReason + ")");
+						}
+					}
+				}
+				catch (Exception enrichCheckEx)
+				{
+					MelonLogger.Warning("[ManifestEnrichment] Failed to check manifest structure for " + Path.GetFileName(text) + ": " + enrichCheckEx.Message);
+				}
 			}
 			catch (Exception ex)
 			{
@@ -1102,6 +1222,15 @@ public class MainClass : MelonMod
 						);
 
 						MelonLogger.Msg("[DeferredEnrichment] ✅ Successfully enriched manifest for " + (modInfo.modName ?? barcode));
+
+						// Add enriched mod to display lists so it shows in the installed tab
+						if (modInfo != null)
+						{
+							NetworkerMenuController.totalInstalled.Add(modInfo);
+							installedMods.Add(modInfo);
+							MelonLogger.Msg("[DeferredEnrichment] Added " + (modInfo.modName ?? barcode) + " to installed mods list (now " + NetworkerMenuController.totalInstalled.Count + " total installed)");
+						}
+
 						succeeded++;
 					}
 					else
@@ -1121,8 +1250,15 @@ public class MainClass : MelonMod
 			MelonLogger.Msg("[DeferredEnrichment] Enrichment complete — " + succeeded + " succeeded, " + failed + " failed out of " + processed + " processed");
 
 			// Refresh UI since new mods were enriched
-			NetworkerMenuController.instance.Refresh();
-			MelonLogger.Msg("[DeferredEnrichment] Refreshed NetworkerMenuController UI");
+			if ((UnityEngine.Object)(object)NetworkerMenuController.instance != null)
+			{
+				NetworkerMenuController.instance.Refresh();
+				MelonLogger.Msg("[DeferredEnrichment] Refreshed NetworkerMenuController UI");
+			}
+			else
+			{
+				MelonLogger.Warning("[DeferredEnrichment] NetworkerMenuController.instance is null — UI refresh skipped");
+			}
 		}
 		catch (Exception ex)
 		{
