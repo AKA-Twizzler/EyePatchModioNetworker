@@ -118,8 +118,8 @@ public class ModFileManager
 	{
 		//IL_003a: Unknown result type (might be due to invalid IL or missing references)
 		//IL_0040: Invalid comparison between Unknown and I4
-		// Suppress log spam — no need to log every frame when idle
-		if (queue.Count == 0 && !isDownloading && !MainClass.warehouseReloadRequested)
+		// Only log when there's actually something to process or a state change
+		if (queue.Count == 0 && !MainClass.warehouseReloadRequested)
 			return;
 		MelonLogger.Msg("[DownloadQueue] CheckQueue: queue=" + queue.Count + " isDownloading=" + isDownloading + " warehouseReady=" + (AssetWarehouse.Instance != null));
 		if (isDownloading || AssetWarehouse.Instance == null || SceneStreamer._session == null || (int)SceneStreamer._session.Status == 1 || queue.Count <= 0)
@@ -224,6 +224,15 @@ public class ModFileManager
 	public static async void DownloadFileHttpClient(string url, string path)
 	{
 		ModInfo modInfo = activeDownloadQueueElement?.info;
+		if (string.IsNullOrEmpty(url))
+		{
+			MelonLogger.Error("[DownloadQueue] DownloadFileHttpClient: URL is null or empty — cannot download");
+			isDownloading = false;
+			activeDownloadQueueElement = null;
+			activeDownloadWebRequest = null;
+			ModlistMenu.activeDownloadModInfo = null;
+			return;
+		}
 		int lastProgressReported = 0;
 		try
 		{
@@ -233,8 +242,17 @@ public class ModFileManager
 				ServerCertificateCustomValidationCallback = (HttpRequestMessage httpRequestMessage, X509Certificate2? cert, X509Chain? cetChain, SslPolicyErrors policyErrors) => true
 			});
 			client.DefaultRequestHeaders.Add("Authorization", "Bearer " + OAUTH_KEY);
+			client.Timeout = TimeSpan.FromSeconds(90);
 			using (HttpResponseMessage response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead))
 			{
+				if (response == null || response.Content == null)
+				{
+					MelonLogger.Error("[DownloadQueue] DownloadFileHttpClient: HTTP response or content is null for " + url);
+					isDownloading = false;
+					activeDownloadQueueElement = null;
+					ModlistMenu.activeDownloadModInfo = null;
+					return;
+				}
 				using Stream streamToReadFrom = await response.Content.ReadAsStreamAsync();
 				long totalBytes = response.Content.Headers.ContentLength ?? 0;
 				long bytesRead = 0L;
@@ -265,11 +283,13 @@ public class ModFileManager
 		}
 		catch (Exception ex)
 		{
-			MelonLogger.Error("[DownloadProgress] " + (modInfo.modName ?? modInfo.modId ?? "unknown") + ": Download FAILED at " + lastProgressReported + "%: " + ex.Message);
+			string modName = modInfo?.modName ?? modInfo?.modId ?? "unknown";
+			MelonLogger.Error("[DownloadQueue] Download FAILED for " + modName + ": " + ex.Message);
 			isDownloading = false;
 			activeDownloadQueueElement = null;
 			activeDownloadWebRequest = null;
 			ModlistMenu.activeDownloadModInfo = null;
+			MelonLogger.Msg("[DownloadQueue] Download queue state reset — ready for next download");
 		}
 	}
 
