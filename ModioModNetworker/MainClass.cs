@@ -136,6 +136,12 @@ public class MainClass : MelonMod
 
 	private bool assetWarehouseLoaded = false;
 
+	// Deferred enrichment queue — processes after AssetWarehouse loads pallets
+	public static Queue<ModInfo> deferredEnrichmentQueue = new Queue<ModInfo>();
+	public static List<string> deferredEnrichmentBarcodes = new List<string>();
+	public static bool isProcessingDeferredEnrichment = false;
+	public static bool hasAdvertisedWarehouseNotReady = false;
+
 	public override void OnInitializeMelon()
 	{
 		//IL_027a: Unknown result type (might be due to invalid IL or missing references)
@@ -552,6 +558,8 @@ public class MainClass : MelonMod
 				NetworkerMenuController.instance.OnNewTrendingRecieved();
 			}
 		}
+		// Process deferred manifest enrichment queue (runs after warehouse is ready)
+		ProcessDeferredEnrichmentQueue();
 	}
 
 	public static void RequestInstallCheck(float delay = 1f)
@@ -1001,115 +1009,10 @@ public class MainClass : MelonMod
 									ModListing richModListing = modInfoFromFile.ToModListing();
 									MelonLogger.Msg("[ManifestEnrichment] ToModListing() completed for " + (modInfoFromFile.modName ?? barcode) + " — ModListing has targets count: " + ((richModListing?.Targets?.Count ?? 0).ToString()));
 
-									if (!string.IsNullOrEmpty(barcode) && AssetWarehouse.Instance != null &&
-										AssetWarehouse.Instance.palletManifests != null &&
-										AssetWarehouse.Instance.palletManifests.ContainsKey(new Barcode(barcode)))
-									{
-										PalletManifest existingManifest = AssetWarehouse.Instance.palletManifests[new Barcode(barcode)];
-										if (existingManifest != null && existingManifest.Pallet != null)
-										{
-											MelonLogger.Msg("[ManifestEnrichment] Calling LoadAndUpdatePalletManifest for " + barcode + " (pallet=" + (existingManifest.Pallet.name ?? "null") + ")");
-
-											try
-											{
-												AssetWarehouse.Instance.LoadAndUpdatePalletManifest(
-													existingManifest.Pallet,
-													richModListing,
-													existingManifest.PalletPath,
-													existingManifest.CatalogPath,
-													(IResourceLocator)null
-												);
-												MelonLogger.Msg("[ManifestEnrichment] ✅ Successfully enriched manifest for " + (modInfoFromFile.modName ?? barcode) + " — objects[\"2\"] now present in .manifest file");
-
-												// Now re-read the enriched manifest to extract display data
-												if (File.Exists(manifestFilePath))
-												{
-													string enrichedManifestJson = File.ReadAllText(manifestFilePath);
-													dynamic enrichedVal = Newtonsoft.Json.JsonConvert.DeserializeObject<object>(enrichedManifestJson);
-
-													if (enrichedVal["objects"] != null && enrichedVal["objects"]["2"] != null)
-													{
-														try
-														{
-															string enrichedVersion = (string)enrichedVal["objects"]["2"]["version"] ?? "0.0.0";
-															string enrichedModId = (string)enrichedVal["objects"]["2"]["title"] ?? modInfoFromFile.modId ?? "unknown";
-															string enrichedSummary = (string)enrichedVal["objects"]["2"]["description"] ?? "";
-															string enrichedThumbnail = (string)enrichedVal["objects"]["2"]["thumbnailUrl"] ?? "";
-
-															// Extract target data for download links
-															string enrichedWindowsLink = "";
-															string enrichedAndroidLink = "";
-															int enrichedRefPc = -1;
-															int enrichedRefAndroid = -1;
-
-															try { enrichedRefPc = (int)enrichedVal["objects"]["2"]["targets"]["pc"]["ref"]; } catch { }
-															try { enrichedRefAndroid = (int)enrichedVal["objects"]["2"]["targets"]["android"]["ref"]; } catch { }
-
-															int enrichedModIdNum = 0;
-															if (enrichedRefPc != -1 && enrichedVal["objects"][enrichedRefPc.ToString()] != null)
-															{
-																enrichedModIdNum = (int)enrichedVal["objects"][enrichedRefPc.ToString()]["modId"];
-																int fileId = (int)enrichedVal["objects"][enrichedRefPc.ToString()]["modfileId"];
-																enrichedWindowsLink = $"https://g-3809.modapi.io/v1/games/3809/mods/{enrichedModIdNum}/files/{fileId}/download";
-																MelonLogger.Msg("[ManifestEnrichment] Extracted PC target: modId=" + enrichedModIdNum + " fileId=" + fileId);
-															}
-															if (enrichedRefAndroid != -1 && enrichedVal["objects"][enrichedRefAndroid.ToString()] != null)
-															{
-																enrichedModIdNum = (int)enrichedVal["objects"][enrichedRefAndroid.ToString()]["modId"];
-																int fileId = (int)enrichedVal["objects"][enrichedRefAndroid.ToString()]["modfileId"];
-																enrichedAndroidLink = $"https://g-3809.modapi.io/v1/games/3809/mods/{enrichedModIdNum}/files/{fileId}/download";
-																MelonLogger.Msg("[ManifestEnrichment] Extracted Android target: modId=" + enrichedModIdNum + " fileId=" + fileId);
-															}
-
-															// Create display ModInfo from enriched manifest
-															ModInfo displayModInfo = new ModInfo();
-															displayModInfo.version = enrichedVersion;
-															displayModInfo.modId = enrichedModId;
-															displayModInfo.modSummary = enrichedSummary;
-															displayModInfo.thumbnailLink = enrichedThumbnail;
-															displayModInfo.windowsDownloadLink = enrichedWindowsLink;
-															displayModInfo.androidDownloadLink = enrichedAndroidLink;
-															displayModInfo.numericalId = enrichedModIdNum.ToString();
-															displayModInfo.isValidMod = true;
-															displayModInfo.structureVersion = ModInfo.globalStructureVersion;
-
-															// Copy additional fields from modinfo.json that the manifest doesn't store
-															displayModInfo.modName = modInfoFromFile.modName ?? enrichedModId;
-															displayModInfo.author = modInfoFromFile.author ?? "ModIoModNetworker";
-															displayModInfo.fileSizeKB = modInfoFromFile.fileSizeKB;
-															displayModInfo.fileName = modInfoFromFile.fileName;
-															displayModInfo.tags = modInfoFromFile.tags;
-															displayModInfo.mature = modInfoFromFile.mature;
-
-															NetworkerMenuController.totalInstalled.Add(displayModInfo);
-															installedMods.Add(displayModInfo);
-															MelonLogger.Msg("[ManifestEnrichment] ✅ Added enriched mod " + enrichedModId + " to installed mods list (now " + installedMods.Count + " total)");
-														}
-														catch (Exception reparseEx)
-														{
-															MelonLogger.Error("[ManifestEnrichment] Failed to reparse enriched manifest for " + manifestFilePath + ": " + reparseEx.Message);
-														}
-													}
-													else
-													{
-														MelonLogger.Warning("[ManifestEnrichment] Re-read of " + manifestFilePath + " STILL has no objects[\"2\"] — LoadAndUpdatePalletManifest may not have written to disk");
-													}
-												}
-											}
-											catch (Exception enrichEx)
-											{
-												MelonLogger.Error("[ManifestEnrichment] LoadAndUpdatePalletManifest FAILED for " + barcode + ": " + enrichEx.Message);
-											}
-										}
-										else
-										{
-											MelonLogger.Warning("[ManifestEnrichment] Existing manifest or Pallet was null for barcode " + barcode + " — cannot enrich");
-										}
-									}
-									else
-									{
-										MelonLogger.Warning("[ManifestEnrichment] Could not find pallet for barcode '" + barcode + "' in AssetWarehouse — pallet may not be loaded yet");
-									}
+									// Queue for deferred enrichment — warehouse may not be ready yet
+									deferredEnrichmentQueue.Enqueue(modInfoFromFile);
+									deferredEnrichmentBarcodes.Add(barcode);
+									MelonLogger.Msg("[ManifestEnrichment] Queued " + (modInfoFromFile.modName ?? barcode) + " for deferred enrichment (queue size: " + deferredEnrichmentQueue.Count + ")");
 								}
 							}
 						}
@@ -1122,7 +1025,113 @@ public class MainClass : MelonMod
 			}
 		}
 		MelonLogger.Msg("PopulateInstalledMods: Found " + installedMods.Count + " installed mods in " + directory);
-		MelonLogger.Msg("PopulateInstalledMods: Total mod files found in directory: " + files.Length + " — " + installedMods.Count + " parsed successfully, " + (files.Length - installedMods.Count) + " enriched or skipped");
+		MelonLogger.Msg("PopulateInstalledMods: Total mod files found in directory: " + files.Length + " — " + installedMods.Count + " parsed successfully, " + deferredEnrichmentQueue.Count + " queued for deferred enrichment, " + (files.Length - installedMods.Count - deferredEnrichmentQueue.Count) + " skipped");
+	}
+
+	public void ProcessDeferredEnrichmentQueue()
+	{
+		if (isProcessingDeferredEnrichment || deferredEnrichmentQueue.Count == 0)
+			return;
+
+		isProcessingDeferredEnrichment = true;
+
+		try
+		{
+			int processed = 0;
+			int succeeded = 0;
+			int failed = 0;
+
+			MelonLogger.Msg("[DeferredEnrichment] Processing deferred enrichment queue — " + deferredEnrichmentQueue.Count + " mods pending");
+
+			while (deferredEnrichmentQueue.Count > 0)
+			{
+				ModInfo modInfo = deferredEnrichmentQueue.Dequeue();
+				string barcode = deferredEnrichmentBarcodes.Count > 0 ? deferredEnrichmentBarcodes[0] : "";
+				if (deferredEnrichmentBarcodes.Count > 0)
+					deferredEnrichmentBarcodes.RemoveAt(0);
+
+				processed++;
+
+				if (string.IsNullOrEmpty(barcode))
+				{
+					MelonLogger.Warning("[DeferredEnrichment] Skipping deferred enrichment — no barcode for mod " + (modInfo.modName ?? "unknown"));
+					failed++;
+					continue;
+				}
+
+				// Check if warehouse is ready and pallet is registered
+				if (AssetWarehouse.Instance == null || AssetWarehouse.Instance.palletManifests == null)
+				{
+					MelonLogger.Warning("[DeferredEnrichment] AssetWarehouse not available yet — requeuing " + (modInfo.modName ?? barcode));
+					deferredEnrichmentQueue.Enqueue(modInfo);
+					deferredEnrichmentBarcodes.Add(barcode);
+					isProcessingDeferredEnrichment = false;
+					return;
+				}
+
+				if (!AssetWarehouse.Instance.palletManifests.ContainsKey(new Barcode(barcode)))
+				{
+					MelonLogger.Warning("[DeferredEnrichment] Pallet not found yet for " + (modInfo.modName ?? barcode) + " — will retry next frame");
+					// Re-queue for retry
+					deferredEnrichmentQueue.Enqueue(modInfo);
+					deferredEnrichmentBarcodes.Add(barcode);
+					// Stop processing for now — let OnUpdate try again later
+					isProcessingDeferredEnrichment = false;
+					return;
+				}
+
+				// Warehouse is ready and pallet found — do the enrichment
+				MelonLogger.Msg("[DeferredEnrichment] Processing deferred enrichment for " + (modInfo.modName ?? barcode) + " (#" + processed + " of " + (processed + deferredEnrichmentQueue.Count) + ")");
+
+				try
+				{
+					ModListing richModListing = modInfo.ToModListing();
+					MelonLogger.Msg("[DeferredEnrichment] ToModListing() completed for " + (modInfo.modName ?? barcode) + " — targets count: " + (richModListing?.Targets?.Count ?? 0));
+
+					PalletManifest existingManifest = AssetWarehouse.Instance.palletManifests[new Barcode(barcode)];
+					if (existingManifest != null && existingManifest.Pallet != null)
+					{
+						MelonLogger.Msg("[DeferredEnrichment] Calling LoadAndUpdatePalletManifest for " + barcode + " (pallet=" + (existingManifest.Pallet.name ?? "null") + ")");
+
+						AssetWarehouse.Instance.LoadAndUpdatePalletManifest(
+							existingManifest.Pallet,
+							richModListing,
+							existingManifest.PalletPath,
+							existingManifest.CatalogPath,
+							(IResourceLocator)null
+						);
+
+						MelonLogger.Msg("[DeferredEnrichment] ✅ Successfully enriched manifest for " + (modInfo.modName ?? barcode));
+						succeeded++;
+					}
+					else
+					{
+						MelonLogger.Warning("[DeferredEnrichment] Manifest or Pallet was null for " + barcode + " — cannot enrich");
+						failed++;
+					}
+				}
+				catch (Exception ex)
+				{
+					MelonLogger.Error("[DeferredEnrichment] Failed to enrich " + (modInfo.modName ?? barcode) + ": " + ex.Message);
+					MelonLogger.Error("[DeferredEnrichment] Stack trace: " + ex.StackTrace);
+					failed++;
+				}
+			}
+
+			MelonLogger.Msg("[DeferredEnrichment] Enrichment complete — " + succeeded + " succeeded, " + failed + " failed out of " + processed + " processed");
+
+			// Refresh UI since new mods were enriched
+			NetworkerMenuController.instance.Refresh();
+			MelonLogger.Msg("[DeferredEnrichment] Refreshed NetworkerMenuController UI");
+		}
+		catch (Exception ex)
+		{
+			MelonLogger.Error("[DeferredEnrichment] Queue processing failed: " + ex.Message);
+		}
+		finally
+		{
+			isProcessingDeferredEnrichment = false;
+		}
 	}
 
 	public void OnStartServer()
