@@ -221,7 +221,7 @@ public class ModFileManager
 		return true;
 	}
 
-	public static async Task DownloadFileHttpClient(string url, string path)
+	public static async void DownloadFileHttpClient(string url, string path)
 	{
 		ModInfo modInfo = activeDownloadQueueElement?.info;
 		int lastProgressReported = 0;
@@ -275,7 +275,7 @@ public class ModFileManager
 
 	public static async Task DownloadFileAsync(string url, string path)
 	{
-		await DownloadFileHttpClient(url, path);
+		DownloadFileHttpClient(url, path);
 	}
 
 	public static void DownloadFile(string url, string path)
