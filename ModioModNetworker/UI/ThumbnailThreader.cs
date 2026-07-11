@@ -14,7 +14,7 @@ namespace ModioModNetworker.UI;
 public class ThumbnailThreader
 {
     private static ConcurrentQueue<ThumbnailCompletionJob> thumbnailCompletionJobs = new ConcurrentQueue<ThumbnailCompletionJob>();
-    private static Dictionary<string, Texture> thumbnailTextureCache = new Dictionary<string, Texture>();
+    private static Dictionary<string, byte[]> thumbnailBytesCache = new Dictionary<string, byte[]>();
     private static readonly object thumbnailCacheLock = new object();
 
     private static HttpClient CreateIPv4HttpClient()
@@ -68,13 +68,36 @@ public class ThumbnailThreader
             return;
         }
 
-        // Check texture cache first
+        // Check texture cache first (store bytes, recreate Texture on hit to avoid white textures)
         lock (thumbnailCacheLock)
         {
-            if (thumbnailTextureCache.TryGetValue(url, out Texture cachedTexture))
+            if (thumbnailBytesCache.TryGetValue(url, out byte[] cachedBytes))
             {
-                MelonLogger.Msg("[ThumbnailThreader] Using cached texture for " + url);
-                action(cachedTexture);
+                MelonLogger.Msg("[ThumbnailThreader] Recreating texture from cached bytes for " + url + " (" + cachedBytes.Length + " bytes)");
+                MainThreadManager.QueueAction(delegate
+                {
+                    try
+                    {
+                        Texture2D texture = new Texture2D(2, 2);
+                        if (ImageConversion.LoadImage(texture, cachedBytes))
+                        {
+                            MelonLogger.Msg("[ThumbnailThreader] Cached texture recreated: " + texture.width + "x" + texture.height);
+                            action(texture);
+                        }
+                        else
+                        {
+                            MelonLogger.Error("[ThumbnailThreader] Failed to recreate texture from cached bytes for " + url);
+                            // Remove bad cache and re-download
+                            thumbnailBytesCache.Remove(url);
+                            MelonLogger.Msg("[ThumbnailThreader] Removed bad cache entry, re-downloading: " + url);
+                            DownloadThumbnail(url, action);
+                        }
+                    }
+                    catch (Exception cacheEx)
+                    {
+                        MelonLogger.Error("[ThumbnailThreader] Cache texture recreation failed for " + url + ": " + cacheEx.Message);
+                    }
+                });
                 return;
             }
         }
@@ -140,11 +163,11 @@ public class ThumbnailThreader
                     if (ImageConversion.LoadImage(texture, capturedBytes))
                     {
                         MelonLogger.Msg("[ThumbnailThreader] Success — created " + texture.width + "x" + texture.height + " texture via " + capturedMethod + " from " + capturedBytes.Length + " bytes");
-                        // Cache the texture for future re-use
+                        // Cache raw bytes for future re-use (not Texture, which becomes white after UI destroy)
                         lock (thumbnailCacheLock)
                         {
-                            thumbnailTextureCache[url] = texture;
-                            MelonLogger.Msg("[ThumbnailThreader] Cached texture for " + url + " (cache size: " + thumbnailTextureCache.Count + ")");
+                            thumbnailBytesCache[url] = capturedBytes;
+                            MelonLogger.Msg("[ThumbnailThreader] Cached " + capturedBytes.Length + " bytes for " + url + " (cache size: " + thumbnailBytesCache.Count + ")");
                         }
                         action(texture);
                     }
