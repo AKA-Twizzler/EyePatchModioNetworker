@@ -625,6 +625,12 @@ public class MainClass : MelonMod
 			info = modInfo
 		}, ignoreTag);
 		subscribedModIoNumericalIds.Add(modInfo.numericalId);
+		// Also push the subscription to mod.io server
+		if (!string.IsNullOrEmpty(modInfo.numericalId) && modInfo.numericalId != "0")
+		{
+			MelonLogger.Msg("[Subscription] Pushing subscription to mod.io server for mod " + (modInfo.modName ?? modInfo.modId ?? modInfo.numericalId));
+			ModFileManager.Subscribe(modInfo.numericalId);
+		}
 		subscribedMods.Add(modInfo);
 	}
 

@@ -119,6 +119,9 @@ public class ModFileManager
 		//IL_003a: Unknown result type (might be due to invalid IL or missing references)
 		//IL_0040: Invalid comparison between Unknown and I4
 		MelonLogger.Msg("[DownloadQueue] CheckQueue: queue=" + queue.Count + " isDownloading=" + isDownloading + " warehouseReady=" + (AssetWarehouse.Instance != null));
+		// Suppress log spam — no need to log every frame when idle
+		if (queue.Count == 0 && !isDownloading && !MainClass.warehouseReloadRequested)
+			return;
 		if (isDownloading || AssetWarehouse.Instance == null || SceneStreamer._session == null || (int)SceneStreamer._session.Status == 1 || queue.Count <= 0)
 		{
 			return;
@@ -218,7 +221,7 @@ public class ModFileManager
 		return true;
 	}
 
-	public static async void DownloadFileHttpClient(string url, string path)
+	public static async Task DownloadFileHttpClient(string url, string path)
 	{
 		ModInfo modInfo = activeDownloadQueueElement?.info;
 		int lastProgressReported = 0;
@@ -233,7 +236,7 @@ public class ModFileManager
 			using (HttpResponseMessage response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead))
 			{
 				using Stream streamToReadFrom = await response.Content.ReadAsStreamAsync();
-				long totalBytes = response.Content.Headers.ContentLength.Value;
+				long totalBytes = response.Content.Headers.ContentLength ?? 0;
 				long bytesRead = 0L;
 				byte[] buffer = new byte[4096];
 				using FileStream fs = new FileStream(path, FileMode.CreateNew);
@@ -247,13 +250,13 @@ public class ModFileManager
 					}
 					await fs.WriteAsync(buffer, 0, bytesReceived);
 					bytesRead += bytesReceived;
-					int progress = (int)(bytesRead * 100 / totalBytes);
-					if (progress >= lastProgressReported + 25)
+					int progress = totalBytes > 0 ? (int)(bytesRead * 100 / totalBytes) : 0;
+					if (totalBytes > 0 && progress >= lastProgressReported + 25)
 					{
 						lastProgressReported = progress;
 						MelonLogger.Msg("[DownloadProgress] " + (modInfo.modName ?? modInfo.modId ?? "unknown") + ": " + progress + "% (" + bytesRead + "/" + totalBytes + " bytes)");
 					}
-					double percentage = (double)bytesRead / (double)totalBytes * 100.0;
+					double percentage = totalBytes > 0 ? (double)bytesRead / (double)totalBytes * 100.0 : 0.0;
 					OnDownloadProgressChanged(percentage);
 				}
 				MelonLogger.Msg("[DownloadProgress] " + (modInfo.modName ?? modInfo.modId ?? "unknown") + ": Download complete (" + totalBytes + " bytes total)");
@@ -263,6 +266,10 @@ public class ModFileManager
 		catch (Exception ex)
 		{
 			MelonLogger.Error("[DownloadProgress] " + (modInfo.modName ?? modInfo.modId ?? "unknown") + ": Download FAILED at " + lastProgressReported + "%: " + ex.Message);
+			isDownloading = false;
+			activeDownloadQueueElement = null;
+			activeDownloadWebRequest = null;
+			ModlistMenu.activeDownloadModInfo = null;
 		}
 	}
 
