@@ -8,6 +8,7 @@ using LabFusion.Network.Serialization;
 using LabFusion.Player;
 using LabFusion.Scene;
 using LabFusion.Senders;
+using MelonLoader;
 using ModioModNetworker.Data;
 using ModioModNetworker.Queue;
 using ModioModNetworker.Utilities;
@@ -30,11 +31,13 @@ public class LevelLoadPatch
 				LevelLoadData val = received.ReadData<LevelLoadData>();
 				if (!MainClass.overrideFusionDL)
 				{
+					MelonLogger.Msg("[OverrideFusionDL] Pass-through — Fusion handles LevelLoadMessage for " + val.LevelBarcode);
 					return true;
 				}
 				LevelHoldQueue.ClearQueue();
 				if (!CrateFilterer.HasCrate<LevelCrate>(new Barcode(val.LevelBarcode)))
 				{
+					MelonLogger.Msg("[OverrideFusionDL] Intercepted LevelLoadMessage — level " + val.LevelBarcode + " not found, queuing for Networker download");
 					LevelHoldQueue.SetQueue(new LevelHoldQueue.LevelHoldQueueData
 					{
 						missingBarcode = val.LevelBarcode,
@@ -81,10 +84,11 @@ public class LevelLoadPatch
 				ModlistData modlistData = ModlistData.Create(PlayerIDManager.LocalID, modInfoForLevelBarcode, ModlistData.ModType.LEVEL);
 				modlistData.Serialize((INetSerializer)(object)val);
 				NetMessage val2 = NetMessage.ModuleCreate<ModlistMessage>(val, CommonMessageRoutes.ReliableToClients, (byte?)null);
-				try
-				{
-					MessageSender.SendFromServer(userId, (NetworkChannel)0, val2);
-				}
+					try
+					{
+						MelonLogger.Msg("[OverrideFusionDL] Host broadcasting ModlistMessage.LEVEL for level " + barcode);
+						MessageSender.SendFromServer(userId, (NetworkChannel)0, val2);
+					}
 				finally
 				{
 					((IDisposable)val2)?.Dispose();
@@ -122,10 +126,11 @@ public class LevelLoadPatch
 				ModlistData modlistData = ModlistData.Create(PlayerIDManager.LocalID, modInfoForLevelBarcode, ModlistData.ModType.LEVEL);
 				modlistData.Serialize((INetSerializer)(object)val);
 				NetMessage val2 = NetMessage.ModuleCreate<ModlistMessage>(val, CommonMessageRoutes.ReliableToClients, (byte?)null);
-				try
-				{
-					MessageSender.BroadcastMessageExceptSelf((NetworkChannel)0, val2);
-				}
+					try
+					{
+						MelonLogger.Msg("[OverrideFusionDL] Host broadcasting ModlistMessage.LEVEL for level " + barcode);
+						MessageSender.BroadcastMessageExceptSelf((NetworkChannel)0, val2);
+					}
 				finally
 				{
 					((IDisposable)val2)?.Dispose();

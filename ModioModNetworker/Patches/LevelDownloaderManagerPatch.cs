@@ -1,5 +1,6 @@
 using HarmonyLib;
 using LabFusion.Scene;
+using MelonLoader;
 
 namespace ModioModNetworker.Patches;
 
@@ -10,8 +11,10 @@ public class LevelDownloaderManagerPatch
 	{
 		if (MainClass.overrideFusionDL)
 		{
+			MelonLogger.Msg("[OverrideFusionDL] Blocked LevelDownloaderManager.LoadWaitingScene — Networker controls download UI");
 			return false;
 		}
+		MelonLogger.Msg("[OverrideFusionDL] Pass-through — Fusion handles LoadWaitingScene");
 		return true;
 	}
 }

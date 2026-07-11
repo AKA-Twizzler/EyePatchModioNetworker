@@ -6,6 +6,7 @@ using LabFusion.Entities;
 using LabFusion.Player;
 using LabFusion.Scene;
 using ModioModNetworker.Data;
+using MelonLoader;
 
 namespace ModioModNetworker.Patches;
 
@@ -44,10 +45,12 @@ public class ModIoDownloaderEnqueuePatch
 					destination = "install_level";
 				}
 				modFile = transaction.ModFile;
+				MelonLogger.Msg("[OverrideFusionDL] Intercepted ModIODownloader.EnqueueDownload — routing to Networker queue (modID=" + item + ", destination=" + destination + ")");
 				ModInfo.RequestModInfoNumerical(modFile.ModID.ToString(), destination);
 			}
 			return false;
 		}
+		MelonLogger.Msg("[OverrideFusionDL] Pass-through — Fusion handles EnqueueDownload (modID=" + transaction.ModFile.ModID + ")");
 		return true;
 	}
 

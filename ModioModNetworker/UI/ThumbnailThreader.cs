@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
@@ -13,6 +14,8 @@ namespace ModioModNetworker.UI;
 public class ThumbnailThreader
 {
     private static ConcurrentQueue<ThumbnailCompletionJob> thumbnailCompletionJobs = new ConcurrentQueue<ThumbnailCompletionJob>();
+    private static HashSet<string> downloadedThumbnailUrls = new HashSet<string>();
+    private static readonly object thumbnailCacheLock = new object();
 
     private static HttpClient CreateIPv4HttpClient()
     {
@@ -63,6 +66,16 @@ public class ThumbnailThreader
         {
             MelonLogger.Warning("[ThumbnailThreader] URL is null or empty — skipping");
             return;
+        }
+
+        lock (thumbnailCacheLock)
+        {
+            if (downloadedThumbnailUrls.Contains(url))
+            {
+                MelonLogger.Msg("[ThumbnailThreader] Skipping already-downloaded thumbnail: " + url);
+                return;
+            }
+            downloadedThumbnailUrls.Add(url);
         }
 
         MelonLogger.Msg("[ThumbnailThreader] Starting download for " + url);

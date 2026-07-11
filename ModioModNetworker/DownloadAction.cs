@@ -33,6 +33,8 @@ public class DownloadAction
 			try
 			{
 				string text = Path.Combine(ModFileManager.MOD_FOLDER_PATH, "tempfolder");
+				string tempzip = ModFileManager.downloadPath;
+				MelonLogger.Msg("[DownloadAction] Starting extraction for " + text + " (size: " + (tempzip != null ? new FileInfo(tempzip).Length.ToString() : "unknown") + " bytes)");
 				if (Directory.Exists(text))
 				{
 					Directory.Delete(text, recursive: true);
@@ -66,6 +68,10 @@ public class DownloadAction
 				{
 					string fullName = Directory.GetParent(text4).FullName;
 					MelonLogger.Msg("Mod folder is: " + fullName);
+					string palletJson = File.ReadAllText(text4);
+					dynamic palletData = JsonConvert.DeserializeObject<object>(palletJson);
+					string barcode = (string)palletData["objects"]["1"]["palletBarcode"];
+					MelonLogger.Msg("[DownloadAction] Found pallet.json at " + text4 + " — barcode: " + barcode);
 					string text5 = (HelperMethods.IsAndroid() ? fullName.Split('/') : fullName.Split('\\'))[^1];
 					string text6 = ModFileManager.MOD_FOLDER_PATH + "/" + text5;
 					bool flag = false;
@@ -73,6 +79,7 @@ public class DownloadAction
 					if (Directory.Exists(text6))
 					{
 						MelonLogger.Msg("Directory exists: " + text6);
+						MelonLogger.Msg("[DownloadAction] Updating existing mod " + barcode + " at path " + text6);
 						flag = true;
 						string text7 = ModFileManager.FindFile(text6, "pallet.json");
 						if (text7 != "")
@@ -92,8 +99,10 @@ public class DownloadAction
 					string path = text6 + "/modinfo.json";
 					string contents = JsonConvert.SerializeObject((object)ModlistMenu.activeDownloadModInfo);
 					File.WriteAllText(path, contents);
+					MelonLogger.Msg("[DownloadAction] Extraction complete for " + barcode + " — setting warehouseReloadRequested = true");
 					if (!flag)
 					{
+						MelonLogger.Msg("[DownloadAction] Installing new mod " + barcode + " to " + text6);
 						MainClass.warehouseReloadFolders.Add(ModFileManager.FindFile(text6, "pallet.json"));
 					}
 					text4 = ModFileManager.FindFile(text, "pallet.json");

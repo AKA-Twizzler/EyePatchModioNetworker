@@ -118,6 +118,7 @@ public class ModFileManager
 	{
 		//IL_003a: Unknown result type (might be due to invalid IL or missing references)
 		//IL_0040: Invalid comparison between Unknown and I4
+		MelonLogger.Msg("[DownloadQueue] CheckQueue: queue=" + queue.Count + " isDownloading=" + isDownloading + " warehouseReady=" + (AssetWarehouse.Instance != null));
 		if (isDownloading || AssetWarehouse.Instance == null || SceneStreamer._session == null || (int)SceneStreamer._session.Status == 1 || queue.Count <= 0)
 		{
 			return;
@@ -127,6 +128,7 @@ public class ModFileManager
 		{
 			queue.RemoveAt(0);
 			activeDownloadQueueElement = downloadQueueElement;
+			MelonLogger.Msg("[DownloadQueue] CheckQueue: Starting download for " + (downloadQueueElement.info.modName ?? downloadQueueElement.info.modId ?? "unknown"));
 			MelonLogger.Msg("Downloading mod " + downloadQueueElement.info.modId);
 			if (activeDownloadQueueElement.associatedPlayer != null && AvatarDownloadBar.bars.TryGetValue(activeDownloadQueueElement.associatedPlayer, out AvatarDownloadBar value))
 			{
@@ -139,16 +141,19 @@ public class ModFileManager
 	public static bool AddToQueue(DownloadQueueElement queueElement, bool ignoreTag = false)
 	{
 		ModInfo info = queueElement.info;
+		MelonLogger.Msg("[DownloadQueue] AddToQueue: mod=" + (info.modName ?? info.modId ?? "unknown") + " numericalId=" + (info.numericalId ?? "0") + " sizeKB=" + info.fileSizeKB + " fromPlayer=" + (queueElement.associatedPlayer != null ? queueElement.associatedPlayer.ToString() : "none"));
 		if (!info.isValidMod)
 		{
 			return false;
 		}
 		if (MainClass.blacklistedModIoIds.Contains(info.modId) || MainClass.blacklistedModIoIds.Contains(info.numericalId))
 		{
+			MelonLogger.Msg("[DownloadQueue] REJECTED: blacklisted for " + (info.modName ?? info.modId ?? "unknown"));
 			return false;
 		}
 		if (info.IsSubscribed())
 		{
+			MelonLogger.Msg("[DownloadQueue] REJECTED: already subscribed for " + (info.modName ?? info.modId ?? "unknown"));
 			return false;
 		}
 		if (!ignoreTag)
@@ -163,15 +168,18 @@ public class ModFileManager
 			}
 			if (!flag)
 			{
+				MelonLogger.Msg("[DownloadQueue] REJECTED: no version tag for " + (info.modName ?? info.modId ?? "unknown"));
 				return false;
 			}
 		}
 		if (activeDownloadQueueElement != null && (activeDownloadQueueElement.info.modId == info.modId || activeDownloadQueueElement.info.numericalId == info.numericalId))
 		{
+			MelonLogger.Msg("[DownloadQueue] REJECTED: already downloading for " + (info.modName ?? info.modId ?? "unknown"));
 			return false;
 		}
 		if (info.mature && !MainClass.downloadMatureContent)
 		{
+			MelonLogger.Msg("[DownloadQueue] REJECTED: mature for " + (info.modName ?? info.modId ?? "unknown"));
 			return false;
 		}
 		if (info.version == null)
@@ -194,49 +202,68 @@ public class ModFileManager
 		}
 		if (flag2 && !flag3)
 		{
+			MelonLogger.Msg("[DownloadQueue] REJECTED: already installed for " + (info.modName ?? info.modId ?? "unknown"));
 			return false;
 		}
 		foreach (DownloadQueueElement item in queue)
 		{
 			if (item.info.modId == info.modId || item.info.numericalId == info.numericalId)
 			{
+				MelonLogger.Msg("[DownloadQueue] REJECTED: already in queue for " + (info.modName ?? info.modId ?? "unknown"));
 				return false;
 			}
 		}
 		queue.Add(queueElement);
+		MelonLogger.Msg("[DownloadQueue] QUEUED: " + (info.modName ?? info.modId ?? "unknown") + " at position " + (queue.Count - 1) + " (queue size: " + queue.Count + ")");
 		return true;
 	}
 
 	public static async void DownloadFileHttpClient(string url, string path)
 	{
-		using HttpClient client = new HttpClient(new HttpClientHandler
+		ModInfo modInfo = activeDownloadQueueElement?.info;
+		int lastProgressReported = 0;
+		try
 		{
-			ClientCertificateOptions = ClientCertificateOption.Manual,
-			ServerCertificateCustomValidationCallback = (HttpRequestMessage httpRequestMessage, X509Certificate2? cert, X509Chain? cetChain, SslPolicyErrors policyErrors) => true
-		});
-		client.DefaultRequestHeaders.Add("Authorization", "Bearer " + OAUTH_KEY);
-		using (HttpResponseMessage response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead))
-		{
-			using Stream streamToReadFrom = await response.Content.ReadAsStreamAsync();
-			long totalBytes = response.Content.Headers.ContentLength.Value;
-			long bytesRead = 0L;
-			byte[] buffer = new byte[4096];
-			using FileStream fs = new FileStream(path, FileMode.CreateNew);
-			while (true)
+			using HttpClient client = new HttpClient(new HttpClientHandler
 			{
-				int num;
-				int bytesReceived = (num = await streamToReadFrom.ReadAsync(buffer, 0, buffer.Length));
-				if (num <= 0)
+				ClientCertificateOptions = ClientCertificateOption.Manual,
+				ServerCertificateCustomValidationCallback = (HttpRequestMessage httpRequestMessage, X509Certificate2? cert, X509Chain? cetChain, SslPolicyErrors policyErrors) => true
+			});
+			client.DefaultRequestHeaders.Add("Authorization", "Bearer " + OAUTH_KEY);
+			using (HttpResponseMessage response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead))
+			{
+				using Stream streamToReadFrom = await response.Content.ReadAsStreamAsync();
+				long totalBytes = response.Content.Headers.ContentLength.Value;
+				long bytesRead = 0L;
+				byte[] buffer = new byte[4096];
+				using FileStream fs = new FileStream(path, FileMode.CreateNew);
+				while (true)
 				{
-					break;
+					int num;
+					int bytesReceived = (num = await streamToReadFrom.ReadAsync(buffer, 0, buffer.Length));
+					if (num <= 0)
+					{
+						break;
+					}
+					await fs.WriteAsync(buffer, 0, bytesReceived);
+					bytesRead += bytesReceived;
+					int progress = (int)(bytesRead * 100 / totalBytes);
+					if (progress >= lastProgressReported + 25)
+					{
+						lastProgressReported = progress;
+						MelonLogger.Msg("[DownloadProgress] " + (modInfo.modName ?? modInfo.modId ?? "unknown") + ": " + progress + "% (" + bytesRead + "/" + totalBytes + " bytes)");
+					}
+					double percentage = (double)bytesRead / (double)totalBytes * 100.0;
+					OnDownloadProgressChanged(percentage);
 				}
-				await fs.WriteAsync(buffer, 0, bytesReceived);
-				bytesRead += bytesReceived;
-				double percentage = (double)bytesRead / (double)totalBytes * 100.0;
-				OnDownloadProgressChanged(percentage);
+				MelonLogger.Msg("[DownloadProgress] " + (modInfo.modName ?? modInfo.modId ?? "unknown") + ": Download complete (" + totalBytes + " bytes total)");
 			}
+			OnDownloadFileCompleted();
 		}
-		OnDownloadFileCompleted();
+		catch (Exception ex)
+		{
+			MelonLogger.Error("[DownloadProgress] " + (modInfo.modName ?? modInfo.modId ?? "unknown") + ": Download FAILED at " + lastProgressReported + "%: " + ex.Message);
+		}
 	}
 
 	public static async Task DownloadFileAsync(string url, string path)

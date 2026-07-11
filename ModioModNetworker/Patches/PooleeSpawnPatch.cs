@@ -9,6 +9,7 @@ using LabFusion.Player;
 using LabFusion.Senders;
 using ModInfo = ModioModNetworker.Data.ModInfo;
 using ModioModNetworker.Utilities;
+using MelonLoader;
 
 namespace ModioModNetworker.Patches;
 
@@ -19,6 +20,11 @@ public class PooleeSpawnPatch
 	{
 		public static void Prefix(Poolee __instance)
 		{
+			if (!MainClass.overrideFusionDL)
+			{
+				MelonLogger.Msg("[OverrideFusionDL] Pass-through — Fusion handles poolee spawn");
+				return;
+			}
 			//IL_0045: Unknown result type (might be due to invalid IL or missing references)
 			if (!MainClass.confirmedHostHasIt || !NetworkInfo.HasServer)
 			{
@@ -39,6 +45,7 @@ public class PooleeSpawnPatch
 					NetMessage val2 = NetMessage.ModuleCreate<ModlistMessage>(val, CommonMessageRoutes.ReliableToClients, (byte?)null);
 					try
 					{
+						MelonLogger.Msg("[OverrideFusionDL] Broadcasting spawnable: " + modInfoForPoolee.modId);
 						MessageSender.BroadcastMessageExceptSelf((NetworkChannel)0, val2);
 					}
 					finally
@@ -70,6 +77,11 @@ public class PooleeSpawnPatch
 	{
 		public static void Prefix(byte ownerID, string barcode, ushort entityID, SerializedTransform serializedTransform, byte playerID, EntitySource source)
 		{
+			if (!MainClass.overrideFusionDL)
+			{
+				MelonLogger.Msg("[OverrideFusionDL] Pass-through — Fusion handles poolee spawn for " + barcode);
+				return;
+			}
 			//IL_003a: Unknown result type (might be due to invalid IL or missing references)
 			if (!NetworkInfo.IsHost)
 			{
@@ -80,21 +92,22 @@ public class PooleeSpawnPatch
 			{
 				return;
 			}
-			NetWriter val = NetWriter.Create();
-			try
-			{
-				ModlistData modlistData = ModlistData.Create(PlayerIDManager.LocalID, modInfoForSpawnableBarcode, ModlistData.ModType.SPAWNABLE);
-				modlistData.Serialize((INetSerializer)(object)val);
-				NetMessage val2 = NetMessage.ModuleCreate<ModlistMessage>(val, CommonMessageRoutes.ReliableToClients, (byte?)null);
+				NetWriter val = NetWriter.Create();
 				try
 				{
-					MessageSender.BroadcastMessageExceptSelf((NetworkChannel)0, val2);
+					ModlistData modlistData = ModlistData.Create(PlayerIDManager.LocalID, modInfoForSpawnableBarcode, ModlistData.ModType.SPAWNABLE);
+					modlistData.Serialize((INetSerializer)(object)val);
+					NetMessage val2 = NetMessage.ModuleCreate<ModlistMessage>(val, CommonMessageRoutes.ReliableToClients, (byte?)null);
+					try
+					{
+						MelonLogger.Msg("[OverrideFusionDL] Broadcasting spawnable: " + barcode);
+						MessageSender.BroadcastMessageExceptSelf((NetworkChannel)0, val2);
+					}
+					finally
+					{
+						((IDisposable)val2)?.Dispose();
+					}
 				}
-				finally
-				{
-					((IDisposable)val2)?.Dispose();
-				}
-			}
 			finally
 			{
 				((IDisposable)val)?.Dispose();

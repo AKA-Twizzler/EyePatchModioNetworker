@@ -4,6 +4,7 @@ using Il2CppSLZ.Marrow.Warehouse;
 using LabFusion.Marrow;
 using LabFusion.Network;
 using ModioModNetworker.Queue;
+using MelonLoader;
 
 namespace ModioModNetworker.Patches;
 
@@ -21,10 +22,12 @@ public class SpawnableResponsePatch
 				SpawnResponseData val = received.ReadData<SpawnResponseData>();
 				if (!MainClass.overrideFusionDL)
 				{
+					MelonLogger.Msg("[OverrideFusionDL] Pass-through — Fusion handles SpawnResponseMessage for " + val.SpawnData.Barcode);
 					return true;
 				}
 				if (!CrateFilterer.HasCrate<GameObjectCrate>(new Barcode(val.SpawnData.Barcode)))
 				{
+					MelonLogger.Msg("[OverrideFusionDL] Intercepted SpawnResponseMessage — spawnable " + val.SpawnData.Barcode + " not found, holding response");
 					SpawnableHoldQueue.AddToQueue(new SpawnableHoldQueueData
 					{
 						missingBarcode = val.SpawnData.Barcode,

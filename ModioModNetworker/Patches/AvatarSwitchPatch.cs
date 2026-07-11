@@ -8,6 +8,7 @@ using LabFusion.Player;
 using LabFusion.Senders;
 using ModInfo = ModioModNetworker.Data.ModInfo;
 using ModioModNetworker.Data;
+using MelonLoader;
 
 namespace ModioModNetworker.Patches;
 
@@ -18,6 +19,11 @@ public class AvatarSwitchPatch
 	{
 		public static void Postfix()
 		{
+			if (!MainClass.overrideFusionDL)
+			{
+				MelonLogger.Msg("[OverrideFusionDL] Pass-through — Fusion handles avatar switch");
+				return;
+			}
 			//IL_00f7: Unknown result type (might be due to invalid IL or missing references)
 			if (!NetworkInfo.HasServer || !MainClass.confirmedHostHasIt)
 			{
@@ -52,6 +58,7 @@ public class AvatarSwitchPatch
 				NetMessage val2 = NetMessage.ModuleCreate<ModlistMessage>(val, CommonMessageRoutes.ReliableToClients, (byte?)null);
 				try
 				{
+					MelonLogger.Msg("[OverrideFusionDL] Broadcasting avatar change: player=" + PlayerIDManager.LocalID.SmallID + " mod=" + modInfo.modId);
 					MessageSender.BroadcastMessageExceptSelf((NetworkChannel)0, val2);
 				}
 				finally

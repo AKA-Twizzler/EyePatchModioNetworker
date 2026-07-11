@@ -409,9 +409,11 @@ public class MainClass : MelonMod
 		}
 		if (warehouseReloadRequested && assetWarehouseLoaded && AssetWarehouse.Instance._initialLoaded && !palletLock)
 		{
+			MelonLogger.Msg("[WarehouseReload] Starting warehouse reload — folders: " + warehouseReloadFolders.Count + " updates: " + warehousePalletReloadTargets.Count);
 			bool flag2 = false;
 			if (warehousePalletReloadTargets.Count > 0)
 			{
+				MelonLogger.Msg("[WarehouseReload] Processing pallet update for " + warehousePalletReloadTargets[0]);
 				ModFileManager.DeleteExistingModObjects(warehousePalletReloadTargets[0]);
 				PalletManifest val = null;
 				var enumerator3 = AssetWarehouse.Instance.palletManifests.GetEnumerator();
@@ -430,12 +432,14 @@ public class MainClass : MelonMod
 			}
 			if (warehouseReloadFolders.Count > 0)
 			{
+				MelonLogger.Msg("[WarehouseReload] Processing folder " + warehouseReloadFolders[0] + " (" + (warehouseReloadFolders.Count + warehousePalletReloadTargets.Count) + " remaining)");
 				AssetWarehouse.Instance.LoadPalletFromFolderAsync(warehouseReloadFolders[0], true, (string)null, ModlistMenu.activeDownloadModInfo.ToModListing());
 				warehouseReloadFolders.RemoveAt(0);
 				palletLock = true;
 			}
 			if (warehouseReloadFolders.Count == 0 && warehousePalletReloadTargets.Count == 0)
 			{
+				MelonLogger.Msg("[WarehouseReload] Complete — notifications sent, state reset");
 				string text = "Downloaded!";
 				string text2 = "This mod has been loaded into the game.";
 				if (flag2)
@@ -520,6 +524,7 @@ public class MainClass : MelonMod
 		}
 		if (refreshInstalledModsRequested && !handlingSubscribed && !handlingInstalled)
 		{
+			MelonLogger.Msg("[RefreshInstalledMods] Starting — clearing lists and spawning scan thread");
 			installedMods.Clear();
 			InstalledModInfos.Clear();
 			NetworkerMenuController.totalInstalled.Clear();
@@ -822,6 +827,7 @@ public class MainClass : MelonMod
 			MelonLogger.Warning("PopulateInstalledMods: Directory not found: '" + directory + "' — no installed mods to display");
 			return;
 		}
+		System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
 		MelonLogger.Msg("PopulateInstalledMods: Scanning " + directory);
 		List<DirectoryInfo> list = new List<DirectoryInfo>();
 		try
@@ -1146,6 +1152,8 @@ public class MainClass : MelonMod
 		}
 		MelonLogger.Msg("PopulateInstalledMods: Found " + installedMods.Count + " installed mods in " + directory);
 		MelonLogger.Msg("PopulateInstalledMods: Total mod files found in directory: " + files.Length + " — " + installedMods.Count + " parsed successfully, " + deferredEnrichmentQueue.Count + " queued for deferred enrichment, " + (files.Length - installedMods.Count - deferredEnrichmentQueue.Count) + " skipped");
+		sw.Stop();
+		MelonLogger.Msg("[PopulateInstalledMods] " + directory + " scan complete in " + sw.ElapsedMilliseconds + "ms");
 	}
 
 	public void ProcessDeferredEnrichmentQueue()
