@@ -143,6 +143,7 @@ public class ModInfo
 		ModListing val = new ModListing();
 		try
 		{
+			MelonLogger.Msg($"[ToModListing] Building ModListing for numericalId={numericalId ?? "null"}, modName={modName ?? "null"}");
 			val.Author = "ModIoModNetworker";
 			val.Title = modId;
 			val.Description = modSummary;
@@ -153,6 +154,7 @@ public class ModInfo
 			val2.ThumbnailOverride = null;
 			val2.GameId = 3809L;
 			val2.ModId = long.Parse(numericalId);
+			MelonLogger.Msg($"[ToModListing] Created ModIOModTarget: GameId={val2.GameId}, ModId={val2.ModId}, ModfileId={val2.ModfileId}");
 			try
 			{
 				if (windowsDownloadLink != null)
@@ -184,8 +186,10 @@ public class ModInfo
 		}
 		catch (Exception ex3)
 		{
+			MelonLogger.Error($"[ToModListing] FAILED to create ModIOModTarget: {ex3.Message}");
 			MelonLogger.Error((object)ex3);
 		}
+		MelonLogger.Msg($"[ToModListing] Finished ModListing with {val.Targets.Count} targets");
 		return val;
 	}
 
@@ -489,6 +493,7 @@ public class ModInfo
 					string text12 = (string)originalModInfo["summary"];
 					string text13 = (string)originalModInfo["logo"]["thumb_640x360"];
 					modInfo.modName = text11;
+					MelonLogger.Msg($"[ModInfo] Setting thumbnailLink to: {(text13 ?? "null")}");
 					modInfo.thumbnailLink = text13;
 					modInfo.modSummary = text12;
 					modInfo.numericalId = text10;
@@ -539,5 +544,6 @@ public class ModInfo
 			return;
 		}
 		action(modInfo);
+		MelonLogger.Msg($"[ModInfo] Make completed: modName={modInfo.modName}, thumbnailLink={(string.IsNullOrEmpty(modInfo.thumbnailLink) ? "EMPTY" : "SET")}, numericalId={modInfo.numericalId}");
 	}
 }

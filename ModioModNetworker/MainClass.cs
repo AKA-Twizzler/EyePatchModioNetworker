@@ -217,6 +217,7 @@ public class MainClass : MelonMod
 			instance.OnCrateAdded += new Action<Barcode>(delegate(Barcode s)
 			{
 				palletLock = false;
+				MelonLogger.Msg($"[Warehouse] OnCrateAdded fired, palletLock released. Loading state: warehouseReloadRequested={warehouseReloadRequested}, warehouseReloadFolders.Count={warehouseReloadFolders?.Count ?? 0}");
 				LevelHoldQueue.CheckValid(s._id);
 				SpawnableHoldQueue.CheckValid(s._id);
 				foreach (NetworkPlayer allNetworkPlayer in NetworkPlayerUtilities.GetAllNetworkPlayers())
@@ -263,6 +264,7 @@ public class MainClass : MelonMod
 				MelonLogger.Error("No auth token available from auth.txt or game/Fusion — mod.io features will be unavailable");
 			}
 		}
+		MelonLogger.Msg($"[Init] Mod initialized. overrideFusionDL={overrideFusionDL}, autoDownloadAvatars={autoDownloadAvatars}");
 	}
 
 	private void OnLobbyCategoryMade(Page category, INetworkLobby lobby)
@@ -466,6 +468,11 @@ public class MainClass : MelonMod
 						break;
 					}
 				}
+				MelonLogger.Msg($"[Warehouse] Calling LoadAndUpdatePalletManifest for activeDownloadModInfo: numericalId={ModlistMenu.activeDownloadModInfo?.numericalId ?? "null"}, modName={ModlistMenu.activeDownloadModInfo?.modName ?? "null"}");
+				if (ModlistMenu.activeDownloadModInfo != null) {
+					var listing = ModlistMenu.activeDownloadModInfo.ToModListing();
+					MelonLogger.Msg($"[Warehouse] ToModListing produced {listing.Targets?.Count ?? 0} targets");
+				}
 				AssetWarehouse.Instance.LoadAndUpdatePalletManifest(val.Pallet, ModlistMenu.activeDownloadModInfo.ToModListing(), val.PalletPath, val.CatalogPath, (IResourceLocator)null);
 				warehousePalletReloadTargets.RemoveAt(0);
 				flag2 = true;
@@ -473,6 +480,11 @@ public class MainClass : MelonMod
 			if (warehouseReloadFolders.Count > 0)
 			{
 				MelonLogger.Msg("[WarehouseReload] Processing folder " + warehouseReloadFolders[0] + " (" + (warehouseReloadFolders.Count + warehousePalletReloadTargets.Count) + " remaining)");
+				MelonLogger.Msg($"[Warehouse] Calling LoadPalletFromFolderAsync for activeDownloadModInfo: numericalId={ModlistMenu.activeDownloadModInfo?.numericalId ?? "null"}, modName={ModlistMenu.activeDownloadModInfo?.modName ?? "null"}");
+				if (ModlistMenu.activeDownloadModInfo != null) {
+					var listing = ModlistMenu.activeDownloadModInfo.ToModListing();
+					MelonLogger.Msg($"[Warehouse] ToModListing produced {listing.Targets?.Count ?? 0} targets");
+				}
 				AssetWarehouse.Instance.LoadPalletFromFolderAsync(warehouseReloadFolders[0], true, (string)null, ModlistMenu.activeDownloadModInfo.ToModListing());
 				warehouseReloadFolders.RemoveAt(0);
 				palletLock = true;
@@ -1207,6 +1219,7 @@ public class MainClass : MelonMod
 							else
 							{
 								MelonLogger.Msg("[ManifestEnrichment] Loaded modinfo.json: modName=" + (modInfoFromFile.modName ?? "null") + " numericalId=" + (modInfoFromFile.numericalId ?? "null"));
+								MelonLogger.Msg($"[Enrichment] Read modinfo.json: numericalId={modInfoFromFile?.numericalId ?? "null"}, thumbnailLink={(modInfoFromFile != null ? (string.IsNullOrEmpty(modInfoFromFile.thumbnailLink) ? "EMPTY" : "SET") : "null")}");
 
 								if (string.IsNullOrEmpty(modInfoFromFile.numericalId))
 								{
@@ -1233,6 +1246,8 @@ public class MainClass : MelonMod
 				}
 			}
 		}
+		MelonLogger.Msg($"[Installed] Found {installedMods?.Count ?? 0} installed mods from manifest scanning");
+		MelonLogger.Msg($"[Installed] Deferred enrichment: {deferredEnrichmentQueue?.Count ?? 0} items queued");
 		MelonLogger.Msg("PopulateInstalledMods: Found " + installedMods.Count + " installed mods in " + directory);
 		MelonLogger.Msg("PopulateInstalledMods: Total mod files found in directory: " + files.Length + " — " + installedMods.Count + " parsed successfully, " + deferredEnrichmentQueue.Count + " queued for deferred enrichment, " + (files.Length - installedMods.Count - deferredEnrichmentQueue.Count) + " skipped");
 		sw.Stop();
@@ -1300,6 +1315,7 @@ public class MainClass : MelonMod
 					MelonLogger.Msg("[DeferredEnrichment] ToModListing() completed for " + (modInfo.modName ?? barcode) + " — targets count: " + (richModListing?.Targets?.Count ?? 0));
 
 					PalletManifest existingManifest = AssetWarehouse.Instance.palletManifests[new Barcode(barcode)];
+					MelonLogger.Msg($"[Enrichment] Processing deferred enrichment: barcode={existingManifest?.Pallet?.Barcode?._id ?? "null"}, hasModInfo={existingManifest != null}");
 					if (existingManifest != null && existingManifest.Pallet != null)
 					{
 						MelonLogger.Msg("[DeferredEnrichment] Calling LoadAndUpdatePalletManifest for " + barcode + " (pallet=" + (existingManifest.Pallet.name ?? "null") + ")");
