@@ -35,6 +35,8 @@ public class ModFileManager
 
 	public static string downloadPath = "";
 
+	private static CancellationTokenSource activeDownloadCts;
+
 	private static readonly HttpClient sharedApiClient = CreateApiClient();
 	private static HttpClient CreateApiClient()
 	{
@@ -75,7 +77,7 @@ public class ModFileManager
 				MaxConnectionsPerServer = 10
 			};
 			var client = new HttpClient(handler);
-			client.Timeout = TimeSpan.FromSeconds(30);
+			client.Timeout = System.Threading.Timeout.InfiniteTimeSpan;
 			MelonLogger.Msg("[HTTP] Shared API HttpClient created (IPv4-forcing, pooled connections)");
 			return client;
 		}
@@ -161,6 +163,9 @@ public class ModFileManager
 
 	public static void StopDownload()
 	{
+		activeDownloadCts?.Cancel();
+		activeDownloadCts?.Dispose();
+		activeDownloadCts = null;
 		if (isDownloading)
 		{
 			if (activeDownloadQueueElement != null && activeDownloadQueueElement.associatedPlayer != null && AvatarDownloadBar.bars.TryGetValue(activeDownloadQueueElement.associatedPlayer, out AvatarDownloadBar value))
@@ -309,14 +314,14 @@ public class ModFileManager
 		int lastProgressReported = 0;
 		try
 		{
-			using HttpClient client = new HttpClient(new HttpClientHandler
-			{
-				ClientCertificateOptions = ClientCertificateOption.Manual,
-				ServerCertificateCustomValidationCallback = (HttpRequestMessage httpRequestMessage, X509Certificate2? cert, X509Chain? cetChain, SslPolicyErrors policyErrors) => true
-			});
-			client.DefaultRequestHeaders.Add("Authorization", "Bearer " + OAUTH_KEY);
-			client.Timeout = TimeSpan.FromSeconds(90);
-			using (HttpResponseMessage response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead))
+			var request = new HttpRequestMessage(HttpMethod.Get, url);
+			request.Headers.Add("Authorization", "Bearer " + OAUTH_KEY);
+
+			activeDownloadCts?.Cancel();
+			activeDownloadCts?.Dispose();
+			using var downloadCts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+			activeDownloadCts = downloadCts;
+			using (HttpResponseMessage response = await sharedApiClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, downloadCts.Token))
 			{
 				if (response == null || response.Content == null)
 				{
@@ -326,7 +331,7 @@ public class ModFileManager
 					ModlistMenu.activeDownloadModInfo = null;
 					return;
 				}
-				using Stream streamToReadFrom = await response.Content.ReadAsStreamAsync();
+				using Stream streamToReadFrom = await response.Content.ReadAsStreamAsync(downloadCts.Token);
 				long totalBytes = response.Content.Headers.ContentLength ?? 0;
 				long bytesRead = 0L;
 				byte[] buffer = new byte[4096];
@@ -334,7 +339,7 @@ public class ModFileManager
 				while (true)
 				{
 					int num;
-					int bytesReceived = (num = await streamToReadFrom.ReadAsync(buffer, 0, buffer.Length));
+					int bytesReceived = (num = await streamToReadFrom.ReadAsync(buffer, 0, buffer.Length, downloadCts.Token));
 					if (num <= 0)
 					{
 						break;
@@ -363,6 +368,7 @@ public class ModFileManager
 			string modName = modInfo?.modName ?? modInfo?.modId ?? "unknown";
 			MelonLogger.Error("[DownloadQueue] Download FAILED for " + modName + ": " + ex.Message);
 			isDownloading = false;
+			activeDownloadCts = null;
 			activeDownloadQueueElement = null;
 			activeDownloadWebRequest = null;
 			ModlistMenu.activeDownloadModInfo = null;
@@ -409,10 +415,10 @@ public class ModFileManager
 			{
 				try
 				{
-				sharedApiClient.DefaultRequestHeaders.Remove("Authorization");
-				sharedApiClient.DefaultRequestHeaders.Add("Authorization", "Bearer " + OAUTH_KEY);
-
-				HttpResponseMessage response = await sharedApiClient.GetAsync(url);
+				using var subCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+				var subRequest = new HttpRequestMessage(HttpMethod.Get, url);
+				subRequest.Headers.Add("Authorization", "Bearer " + OAUTH_KEY);
+				HttpResponseMessage response = await sharedApiClient.SendAsync(subRequest, subCts.Token);
 				string responseText = await response.Content.ReadAsStringAsync();
 
 				if (response.IsSuccessStatusCode)
@@ -471,16 +477,13 @@ public class ModFileManager
 			{
 				try
 				{
-				sharedApiClient.DefaultRequestHeaders.Remove("Authorization");
-				sharedApiClient.DefaultRequestHeaders.Add("Authorization", "Bearer " + OAUTH_KEY);
-				sharedApiClient.DefaultRequestHeaders.Remove("Accept");
-				sharedApiClient.DefaultRequestHeaders.Add("Accept", "application/json");
-				sharedApiClient.DefaultRequestHeaders.Remove("X-Modio-Platform");
-				sharedApiClient.DefaultRequestHeaders.Add("X-Modio-Platform", "windows");
-				sharedApiClient.DefaultRequestHeaders.Remove("X-Modio-Portal");
-				sharedApiClient.DefaultRequestHeaders.Add("X-Modio-Portal", "steam");
-
-				HttpResponseMessage response = await sharedApiClient.GetAsync(url);
+				using var trendCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+				var trendRequest = new HttpRequestMessage(HttpMethod.Get, url);
+				trendRequest.Headers.Add("Authorization", "Bearer " + OAUTH_KEY);
+				trendRequest.Headers.Add("Accept", "application/json");
+				trendRequest.Headers.Add("X-Modio-Platform", "windows");
+				trendRequest.Headers.Add("X-Modio-Portal", "steam");
+				HttpResponseMessage response = await sharedApiClient.SendAsync(trendRequest, trendCts.Token);
 				string responseText = await response.Content.ReadAsStringAsync();
 
 				if (response.IsSuccessStatusCode)
@@ -523,11 +526,11 @@ public class ModFileManager
 		{
 			try
 			{
-				sharedApiClient.DefaultRequestHeaders.Remove("Authorization");
-				sharedApiClient.DefaultRequestHeaders.Add("Authorization", "Bearer " + OAUTH_KEY);
-
-				var content = new FormUrlEncodedContent(new Dictionary<string, string>());
-				HttpResponseMessage response = await sharedApiClient.PostAsync(url, content);
+				using var subCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+				var subRequest = new HttpRequestMessage(HttpMethod.Post, url);
+				subRequest.Headers.Add("Authorization", "Bearer " + OAUTH_KEY);
+				subRequest.Content = new FormUrlEncodedContent(new Dictionary<string, string>());
+				HttpResponseMessage response = await sharedApiClient.SendAsync(subRequest, subCts.Token);
 				string responseBody = await response.Content.ReadAsStringAsync();
 				int statusCode = (int)response.StatusCode;
 
@@ -575,13 +578,11 @@ public class ModFileManager
 		{
 			try
 			{
-				sharedApiClient.DefaultRequestHeaders.Remove("Authorization");
-				sharedApiClient.DefaultRequestHeaders.Add("Authorization", "Bearer " + OAUTH_KEY);
-
-				// Must use HttpRequestMessage to set Content-Type on DELETE requests
-				var request = new HttpRequestMessage(HttpMethod.Delete, url);
-				request.Content = new FormUrlEncodedContent(new Dictionary<string, string>());
-				HttpResponseMessage response = await sharedApiClient.SendAsync(request);
+				using var unsubCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+				var unsubRequest = new HttpRequestMessage(HttpMethod.Delete, url);
+				unsubRequest.Headers.Add("Authorization", "Bearer " + OAUTH_KEY);
+				unsubRequest.Content = new FormUrlEncodedContent(new Dictionary<string, string>());
+				HttpResponseMessage response = await sharedApiClient.SendAsync(unsubRequest, unsubCts.Token);
 				string responseBody = await response.Content.ReadAsStringAsync();
 				int statusCode = (int)response.StatusCode;
 
