@@ -503,6 +503,10 @@ public class ModInfo
 						modInfo.tags.Add((string)item3["name"]);
 					}
 				}
+				if (modInfo.tags.Count == 0 && !string.IsNullOrEmpty(modId))
+				{
+					MelonLogger.Warning("[Make] Tags empty for " + (modInfo.modName ?? "unknown") + " (" + modId + ") — will be fixed by TagFix");
+				}
 				modInfo.fileSizeKB = (float)val3["filesize"];
 				if (!HelperMethods.IsAndroid())
 				{

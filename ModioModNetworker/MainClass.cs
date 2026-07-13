@@ -1093,6 +1093,36 @@ public class MainClass : MelonMod
 					enrichReason = "enrichment check exception: " + enrichCheckEx.Message;
 				}
 				
+			// Also check for tag mismatch — if manifest has 0 tags but modinfo.json has them
+			if (!needsEnrichment && modInfo.tags.Count == 0)
+			{
+				string modFolderForTags = text.EndsWith(".manifest")
+					? text.Substring(0, text.Length - ".manifest".Length)
+					: "";
+				string mjTagPath = System.IO.Path.Combine(modFolderForTags, "modinfo.json");
+				if (System.IO.File.Exists(mjTagPath))
+				{
+					try
+					{
+						string mjTagJson = System.IO.File.ReadAllText(mjTagPath);
+						ModInfo mjTagInfo = Newtonsoft.Json.JsonConvert.DeserializeObject<ModInfo>(mjTagJson, new Newtonsoft.Json.JsonSerializerSettings
+						{
+							MissingMemberHandling = Newtonsoft.Json.MissingMemberHandling.Ignore,
+							Error = (sender, args) => args.ErrorContext.Handled = true
+						});
+						if (mjTagInfo != null && mjTagInfo.tags != null && mjTagInfo.tags.Count > 0)
+						{
+							MelonLogger.Msg("[Enrichment] Manifest has 0 tags but modinfo.json has " + mjTagInfo.tags.Count + " — queuing enrichment for " + text);
+							needsEnrichment = true;
+						}
+					}
+					catch (System.Exception)
+					{
+						// Silently handle — don't block mod loading
+					}
+				}
+			}
+			
 				if (!needsEnrichment)
 				{
 					NetworkerMenuController.totalInstalled.Add(modInfo);
