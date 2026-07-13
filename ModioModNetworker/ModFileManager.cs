@@ -761,53 +761,155 @@ public class ModFileManager
 		thread.Start();
 	}
 
-	public static void GetJson(string mod, Action<string> onCompleted)
+	public static async void GetJson(string mod, Action<string> onCompleted)
 	{
-		string text = API_PATH + mod + "/files";
-		UnityWebRequest httpWebRequest = UnityWebRequest.Get(text);
-		httpWebRequest.SetRequestHeader("Authorization", "Bearer " + OAUTH_KEY);
-		UnityWebRequestAsyncOperation val = httpWebRequest.SendWebRequest();
-		((AsyncOperation)val).m_completeCallback = ((AsyncOperation)val).m_completeCallback + new Action<AsyncOperation>(delegate
-		{
-			if (httpWebRequest.result != UnityWebRequest.Result.Success)
-			{
-				MelonLogger.Error("[ModFileManager] GetJson FAILED: " + text + " — result=" + httpWebRequest.result + " error=" + (httpWebRequest.error ?? "none"));
-				return;
-			}
-			string text2 = httpWebRequest.downloadHandler.text;
-			onCompleted?.Invoke(text2);
-		});
+		string url = API_PATH + mod + "/files";
+		int maxAttempts = 3;
 
+		for (int attempt = 1; attempt <= maxAttempts; attempt++)
+		{
+			MelonLogger.Msg("[GetJson] Attempt " + attempt + "/" + maxAttempts + " for " + url);
+			try
+			{
+				using (var request = new HttpRequestMessage(HttpMethod.Get, url))
+				{
+					request.Headers.Add("Authorization", "Bearer " + OAUTH_KEY);
+					using (HttpResponseMessage response = await sharedApiClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead))
+					{
+						if (response.IsSuccessStatusCode)
+						{
+							string body = await response.Content.ReadAsStringAsync();
+							onCompleted?.Invoke(body);
+							return;
+						}
+
+						int statusCode = (int)response.StatusCode;
+						if (statusCode >= 400 && statusCode < 500)
+						{
+							MelonLogger.Error("[ModFileManager] GetJson FAILED: " + url + " — HTTP " + statusCode);
+							return;
+						}
+
+						if (attempt == maxAttempts)
+						{
+							MelonLogger.Error("[GetJson] FAILED after " + maxAttempts + " attempts: " + url + " — HTTP " + statusCode);
+							return;
+						}
+					}
+				}
+			}
+			catch (HttpRequestException ex)
+			{
+				if (attempt == maxAttempts)
+				{
+					MelonLogger.Error("[GetJson] FAILED after " + maxAttempts + " attempts: " + url + " — " + ex.Message);
+					return;
+				}
+			}
+			catch (TaskCanceledException ex)
+			{
+				if (attempt == maxAttempts)
+				{
+					MelonLogger.Error("[GetJson] FAILED after " + maxAttempts + " attempts: " + url + " — " + ex.Message);
+					return;
+				}
+			}
+			catch (SocketException ex)
+			{
+				if (attempt == maxAttempts)
+				{
+					MelonLogger.Error("[GetJson] FAILED after " + maxAttempts + " attempts: " + url + " — " + ex.Message);
+					return;
+				}
+			}
+
+			if (attempt < maxAttempts)
+			{
+				await Task.Delay(attempt * 1000);
+			}
+		}
 	}
 
-	public static void GetRawModInfoJson(string mod, Action<dynamic> onCompleted)
+	public static async void GetRawModInfoJson(string mod, Action<dynamic> onCompleted)
 	{
-		string json = "";
+		string url = API_PATH + mod;
+		int maxAttempts = 3;
+
 		try
 		{
-			string text = API_PATH + mod;
-			UnityWebRequest httpWebRequest = UnityWebRequest.Get(text);
-			httpWebRequest.SetRequestHeader("Authorization", "Bearer " + OAUTH_KEY);
-			UnityWebRequestAsyncOperation val = httpWebRequest.SendWebRequest();
-		((AsyncOperation)val).m_completeCallback = ((AsyncOperation)val).m_completeCallback + new Action<AsyncOperation>(delegate
-		{
-			if (httpWebRequest.result != UnityWebRequest.Result.Success)
+			for (int attempt = 1; attempt <= maxAttempts; attempt++)
 			{
-				MelonLogger.Error("[ModFileManager] GetRawModInfoJson FAILED: " + text + " — result=" + httpWebRequest.result + " error=" + (httpWebRequest.error ?? "none"));
-				// Call callback with null so caller knows it failed
-				onCompleted(null);
-				return;
-			}
-			json = httpWebRequest.downloadHandler.text;
-			dynamic val2 = JsonConvert.DeserializeObject<object>(json);
-			((Action<object>)onCompleted)?.Invoke(val2);
-		});
+				MelonLogger.Msg("[GetRawModInfoJson] Attempt " + attempt + "/" + maxAttempts + " for " + url);
+				try
+				{
+					using (var request = new HttpRequestMessage(HttpMethod.Get, url))
+					{
+						request.Headers.Add("Authorization", "Bearer " + OAUTH_KEY);
+						using (HttpResponseMessage response = await sharedApiClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead))
+						{
+							if (response.IsSuccessStatusCode)
+							{
+								string json = await response.Content.ReadAsStringAsync();
+								dynamic result = JsonConvert.DeserializeObject<object>(json);
+								onCompleted?.Invoke(result);
+								return;
+							}
 
+							int statusCode = (int)response.StatusCode;
+							if (statusCode >= 400 && statusCode < 500)
+							{
+								MelonLogger.Error("[ModFileManager] GetRawModInfoJson FAILED: " + url + " — HTTP " + statusCode);
+								onCompleted(null);
+								return;
+							}
+
+							if (attempt == maxAttempts)
+							{
+								MelonLogger.Error("[GetRawModInfoJson] FAILED after " + maxAttempts + " attempts: " + url + " — HTTP " + statusCode);
+								onCompleted(null);
+								return;
+							}
+						}
+					}
+				}
+				catch (HttpRequestException ex)
+				{
+					if (attempt == maxAttempts)
+					{
+						MelonLogger.Error("[GetRawModInfoJson] FAILED after " + maxAttempts + " attempts: " + url + " — " + ex.Message);
+						onCompleted(null);
+						return;
+					}
+				}
+				catch (TaskCanceledException ex)
+				{
+					if (attempt == maxAttempts)
+					{
+						MelonLogger.Error("[GetRawModInfoJson] FAILED after " + maxAttempts + " attempts: " + url + " — " + ex.Message);
+						onCompleted(null);
+						return;
+					}
+				}
+				catch (SocketException ex)
+				{
+					if (attempt == maxAttempts)
+					{
+						MelonLogger.Error("[GetRawModInfoJson] FAILED after " + maxAttempts + " attempts: " + url + " — " + ex.Message);
+						onCompleted(null);
+						return;
+					}
+				}
+
+				if (attempt < maxAttempts)
+				{
+					await Task.Delay(attempt * 1000);
+				}
+			}
 		}
 		catch (Exception ex)
 		{
 			MelonLogger.Error("Error when fetching raw mod info for " + mod + ": ");
-			MelonLogger.Error((object)ex);
+			MelonLogger.Error(ex);
 		}
 	}
 }
