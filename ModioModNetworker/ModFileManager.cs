@@ -115,7 +115,6 @@ public class ModFileManager
 
 	public static void Initialize()
 	{
-		ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
 	}
 
 	private static void OnDownloadFileCompleted()

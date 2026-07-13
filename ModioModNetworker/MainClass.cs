@@ -31,6 +31,7 @@ using Newtonsoft.Json.Linq;
 
 using UnityEngine;
 using UnityEngine.AddressableAssets.ResourceLocators;
+using System.Net;
 
 namespace ModioModNetworker;
 
@@ -146,6 +147,7 @@ public class MainClass : MelonMod
 
 	public override void OnInitializeMelon()
 	{
+		ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
 		//IL_027a: Unknown result type (might be due to invalid IL or missing references)
 		//IL_0284: Expected O, but got Unknown
 		//IL_028c: Unknown result type (might be due to invalid IL or missing references)
