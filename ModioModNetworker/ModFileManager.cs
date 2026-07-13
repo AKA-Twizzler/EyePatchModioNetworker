@@ -372,7 +372,7 @@ public class ModFileManager
 
 			activeDownloadCts?.Cancel();
 			activeDownloadCts?.Dispose();
-			using var downloadCts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+			using var downloadCts = new CancellationTokenSource();
 			activeDownloadCts = downloadCts;
 			using (HttpResponseMessage response = await sharedApiClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, downloadCts.Token))
 			{
@@ -415,6 +415,21 @@ public class ModFileManager
 				}
 				MelonLogger.Msg("[DownloadProgress] " + (modInfo.modName ?? modInfo.modId ?? "unknown") + ": Download complete (" + totalBytes + " bytes total)");
 			}
+
+			// Validate downloaded file size — reject if too small to be a valid ZIP
+			long fileSize = new FileInfo(path).Length;
+			if (fileSize < 1024)
+			{
+				MelonLogger.Error("[DownloadQueue] Downloaded file too small to be valid (" + fileSize + " bytes). modId=" + (modInfo?.modId ?? "unknown") + " — likely HTTP error response, not a mod file. Deleting and resetting.");
+				try { File.Delete(path); } catch { }
+				isDownloading = false;
+				activeDownloadCts = null;
+				activeDownloadQueueElement = null;
+				activeDownloadWebRequest = null;
+				ModlistMenu.activeDownloadModInfo = null;
+				return;
+			}
+
 			OnDownloadFileCompleted();
 			activeDownloadCts = null;  // Clear static ref BEFORE using var disposes the local CTS
 			MelonLogger.Msg("[CTS] activeDownloadCts cleared — ready for next download");

@@ -35,6 +35,21 @@ public class DownloadAction
 				string text = Path.Combine(ModFileManager.MOD_FOLDER_PATH, "tempfolder");
 				string tempzip = ModFileManager.downloadPath;
 				MelonLogger.Msg("[DownloadAction] Starting extraction for " + text + " (size: " + (tempzip != null ? new FileInfo(tempzip).Length.ToString() : "unknown") + " bytes)");
+
+				// Validate downloaded file size — reject if too small to be a valid ZIP
+				long fileSize = tempzip != null ? new FileInfo(tempzip).Length : 0;
+				if (fileSize < 1024)
+				{
+					MelonLogger.Error("[DownloadAction] File too small to be a valid mod ZIP (" + fileSize + " bytes) — aborting extraction. modId=" + (ModlistMenu.activeDownloadModInfo?.modId ?? "unknown"));
+					try { if (File.Exists(tempzip)) File.Delete(tempzip); } catch { }
+					try { if (Directory.Exists(text)) Directory.Delete(text, recursive: true); } catch { }
+					ModFileManager.isDownloading = false;
+					ModFileManager.activeDownloadQueueElement = null;
+					ModFileManager.activeDownloadWebRequest = null;
+					ModlistMenu.activeDownloadModInfo = null;
+					return;
+				}
+
 				if (Directory.Exists(text))
 				{
 					Directory.Delete(text, recursive: true);

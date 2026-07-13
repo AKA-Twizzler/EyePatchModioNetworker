@@ -433,6 +433,17 @@ public class MainClass : MelonMod
 				subsRefreshing = false;
 			}
 		}
+		// Safety: If handlingSubscribed is stuck with subsRefreshing=true (completion never triggered), force-reset after 30s
+		if (handlingSubscribed && subsRefreshing && subscribedModIoNumericalIds.Count < desiredSubs)
+		{
+			double elapsed = (DateTime.UtcNow - lastSubRefreshAttempt).TotalSeconds;
+			if (elapsed > 30.0)
+			{
+				MelonLogger.Warning("[Subscription] Safety timeout — subsRefreshing stuck for " + elapsed.ToString("F0") + " seconds with " + subscribedModIoNumericalIds.Count + "/" + desiredSubs + " subscriptions — force-resetting");
+				handlingSubscribed = false;
+				subsRefreshing = false;
+			}
+		}
 		if (subsRefreshing && subscribedModIoNumericalIds.Count >= desiredSubs)
 		{
 			foreach (string toRemoveSubscribedModIoId in toRemoveSubscribedModIoIds)
@@ -575,17 +586,24 @@ public class MainClass : MelonMod
 			ModlistMenu.Refresh(openMenu: true);
 			menuRefreshRequested = false;
 		}
-		if (refreshSubscribedModsRequested && !handlingInstalled && !handlingSubscribed)
+		if (refreshSubscribedModsRequested)
 		{
-			refreshSubscribedModsRequested = false;
-			handlingSubscribed = true;
-			lastSubRefreshAttempt = DateTime.UtcNow;
-			// Don't clear lists yet — will clear AFTER API succeeds
-			subTotal = 0;
-			subsShown = 0;
-			desiredSubs = 0;
-			MelonLogger.Msg("[Subscription] Refresh button pressed — requesting subscription list from mod.io");
-			ModFileManager.QueueSubscriptions(subsShown);
+			if (handlingInstalled || handlingSubscribed)
+			{
+				MelonLogger.Warning("[Subscription] Refresh blocked — handlingInstalled=" + handlingInstalled + " handlingSubscribed=" + handlingSubscribed + " — will retry when state clears");
+			}
+			else
+			{
+				refreshSubscribedModsRequested = false;
+				handlingSubscribed = true;
+				lastSubRefreshAttempt = DateTime.UtcNow;
+				// Don't clear lists yet — will clear AFTER API succeeds
+				subTotal = 0;
+				subsShown = 0;
+				desiredSubs = 0;
+				MelonLogger.Msg("[Subscription] Refresh button pressed — requesting subscription list from mod.io");
+				ModFileManager.QueueSubscriptions(subsShown);
+			}
 		}
 		if (refreshInstalledModsRequested && !handlingSubscribed && !handlingInstalled)
 		{
