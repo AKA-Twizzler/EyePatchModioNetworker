@@ -645,11 +645,12 @@ public class MainClass : MelonMod
 			modInfo.structureVersion = ModInfo.globalStructureVersion;
 			modInfo.windowsDownloadLink = subscribed.windowsDownloadLink;
 			modInfo.androidDownloadLink = subscribed.androidDownloadLink;
+			modInfo.tags = new List<string>(subscribed.tags);
 			if (modInfo.version == null)
 			{
 				modInfo.version = "0.0.0";
 			}
-			string path = Path.Combine(Directory.GetParent(installed.palletPath).Name, "modinfo.json");
+			string path = Path.Combine(Path.GetDirectoryName(installed.palletPath), "modinfo.json");
 			File.Delete(path);
 			string contents = JsonConvert.SerializeObject((object)modInfo);
 			File.WriteAllText(path, contents);
@@ -1129,6 +1130,13 @@ public class MainClass : MelonMod
 							deferredEnrichmentQueue.Enqueue(modInfoFromFile2);
 							deferredEnrichmentBarcodes.Add(barcode2);
 							MelonLogger.Msg("[ManifestEnrichment] Queued " + (modInfoFromFile2.modName ?? barcode2) + " for enrichment (reason: " + enrichReason + ", queue size: " + deferredEnrichmentQueue.Count + ")");
+
+							// If tags are empty, fetch from API and update modinfo.json asynchronously
+							if (modInfoFromFile2.tags.Count == 0)
+							{
+								MelonLogger.Msg("[ManifestEnrichment] Tags empty for " + (modInfoFromFile2.modName ?? barcode2) + " — scheduling async API fetch");
+								FetchTagsAndUpdateModInfo(modInfoPath, modInfoFromFile2.numericalId);
+							}
 						}
 						else
 						{
@@ -1209,6 +1217,13 @@ public class MainClass : MelonMod
 									deferredEnrichmentQueue.Enqueue(modInfoFromFile);
 									deferredEnrichmentBarcodes.Add(barcode);
 									MelonLogger.Msg("[ManifestEnrichment] Queued " + (modInfoFromFile.modName ?? barcode) + " for deferred enrichment (queue size: " + deferredEnrichmentQueue.Count + ")");
+
+									// If tags are empty, fetch from API and update modinfo.json asynchronously
+									if (modInfoFromFile.tags.Count == 0)
+									{
+										MelonLogger.Msg("[ManifestEnrichment] Tags empty for " + (modInfoFromFile.modName ?? barcode) + " — scheduling async API fetch");
+										FetchTagsAndUpdateModInfo(modInfoPath, modInfoFromFile.numericalId);
+									}
 								}
 							}
 						}
@@ -1427,6 +1442,76 @@ public class MainClass : MelonMod
 		{
 			isProcessingDeferredEnrichment = false;
 		}
+	}
+
+	/// <summary>
+	/// Asynchronously fetches tags from the mod.io API for a given numericalId
+	/// and updates modinfo.json on disk. This is a best-effort operation —
+	/// enrichment proceeds without waiting. Tags will be available on the next
+	/// enrichment cycle.
+	/// </summary>
+	private static void FetchTagsAndUpdateModInfo(string modInfoPath, string numericalId)
+	{
+		if (string.IsNullOrEmpty(modInfoPath) || string.IsNullOrEmpty(numericalId))
+			return;
+
+		ModFileManager.GetRawModInfoJson(numericalId, delegate(dynamic totalModInfo)
+		{
+			try
+			{
+				if ((object)totalModInfo == null)
+				{
+					MelonLogger.Warning($"[TagFix] GetRawModInfoJson returned null for {numericalId}");
+					return;
+				}
+
+				var tagsArray = totalModInfo["tags"];
+				if (tagsArray == null)
+				{
+					MelonLogger.Msg($"[TagFix] No tags in API response for {numericalId}");
+					return;
+				}
+
+				List<string> fetchedTags = new List<string>();
+				foreach (dynamic tag in tagsArray)
+				{
+					fetchedTags.Add((string)tag["name"]);
+				}
+
+				if (fetchedTags.Count == 0)
+				{
+					MelonLogger.Msg($"[TagFix] API returned empty tags for {numericalId}");
+					return;
+				}
+
+				if (!File.Exists(modInfoPath))
+				{
+					MelonLogger.Warning($"[TagFix] modinfo.json no longer exists at {modInfoPath}");
+					return;
+				}
+
+				string json = File.ReadAllText(modInfoPath);
+				var modInfo = JsonConvert.DeserializeObject<ModInfo>(json, new JsonSerializerSettings
+				{
+					MissingMemberHandling = MissingMemberHandling.Ignore,
+					Error = (sender, args) => args.ErrorContext.Handled = true
+				});
+
+				if (modInfo == null)
+				{
+					MelonLogger.Warning($"[TagFix] Failed to deserialize modinfo.json at {modInfoPath}");
+					return;
+				}
+
+				modInfo.tags = fetchedTags;
+				File.WriteAllText(modInfoPath, JsonConvert.SerializeObject((object)modInfo));
+				MelonLogger.Msg($"[TagFix] Fetched {fetchedTags.Count} tags from API for {numericalId} and updated {modInfoPath}");
+			}
+			catch (Exception ex)
+			{
+				MelonLogger.Warning($"[TagFix] Failed to fetch tags for {numericalId}: {ex.Message}");
+			}
+		});
 	}
 
 	public void OnStartServer()
