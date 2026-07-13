@@ -144,6 +144,7 @@ public class MainClass : MelonMod
 	public static List<string> deferredEnrichmentBarcodes = new List<string>();
 	public static bool isProcessingDeferredEnrichment = false;
 	public static bool hasAdvertisedWarehouseNotReady = false;
+	private static bool _warehouseFirstCrateLogged = false;
 
 	public override void OnInitializeMelon()
 	{
@@ -216,11 +217,16 @@ public class MainClass : MelonMod
 		AssetWarehouse.OnReady(new System.Action(delegate
 		{
 			AssetWarehouse instance = AssetWarehouse.Instance;
-			instance.OnCrateAdded += new Action<Barcode>(delegate(Barcode s)
+		instance.OnCrateAdded += new Action<Barcode>(delegate(Barcode s)
+		{
+			palletLock = false;
+			// Log only on state change: first crate after boot, or when a reload is actually in progress
+			if (!_warehouseFirstCrateLogged || warehouseReloadRequested)
 			{
-				palletLock = false;
+				_warehouseFirstCrateLogged = true;
 				MelonLogger.Msg($"[Warehouse] OnCrateAdded fired, palletLock released. Loading state: warehouseReloadRequested={warehouseReloadRequested}, warehouseReloadFolders.Count={warehouseReloadFolders?.Count ?? 0}");
-				LevelHoldQueue.CheckValid(s._id);
+			}
+			LevelHoldQueue.CheckValid(s._id);
 				SpawnableHoldQueue.CheckValid(s._id);
 				foreach (NetworkPlayer allNetworkPlayer in NetworkPlayerUtilities.GetAllNetworkPlayers())
 				{
@@ -1455,6 +1461,7 @@ public class MainClass : MelonMod
 		if (string.IsNullOrEmpty(modInfoPath) || string.IsNullOrEmpty(numericalId))
 			return;
 
+		MelonLogger.Msg($"[TagFix] Fetching tags from API for mod {numericalId}");
 		ModFileManager.GetRawModInfoJson(numericalId, delegate(dynamic totalModInfo)
 		{
 			try

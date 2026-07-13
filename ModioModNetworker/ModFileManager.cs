@@ -37,6 +37,8 @@ public class ModFileManager
 
 	private static CancellationTokenSource activeDownloadCts;
 
+	private static bool _downloadProgressStartLogged = false;
+
 	private static readonly HttpClient sharedApiClient = CreateApiClient();
 	private static HttpClient CreateApiClient()
 	{
@@ -162,6 +164,7 @@ public class ModFileManager
 
 	public static void StopDownload()
 	{
+		_downloadProgressStartLogged = false;
 		activeDownloadCts?.Cancel();
 		activeDownloadCts?.Dispose();
 		activeDownloadCts = null;
@@ -300,6 +303,7 @@ public class ModFileManager
 
 	public static async void DownloadFileHttpClient(string url, string path)
 	{
+		_downloadProgressStartLogged = false;
 		ModInfo modInfo = activeDownloadQueueElement?.info;
 		if (string.IsNullOrEmpty(url))
 		{
@@ -346,8 +350,9 @@ public class ModFileManager
 					await fs.WriteAsync(buffer, 0, bytesReceived);
 					bytesRead += bytesReceived;
 					int progress = totalBytes > 0 ? (int)(bytesRead * 100 / totalBytes) : 0;
-					if (lastProgressReported == 0)
+					if (!_downloadProgressStartLogged && lastProgressReported == 0)
 					{
+						_downloadProgressStartLogged = true;
 						MelonLogger.Msg("[DownloadProgress] " + (modInfo?.modName ?? modInfo?.modId ?? "unknown") + ": 0% — download started (" + bytesRead + "/" + totalBytes + " bytes)");
 					}
 					if (totalBytes > 0 && progress >= lastProgressReported + 25)
