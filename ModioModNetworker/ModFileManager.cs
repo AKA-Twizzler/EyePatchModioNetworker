@@ -204,41 +204,54 @@ public class ModFileManager
 		}
 		DownloadQueueElement downloadQueueElement = queue[0];
 		activeDownloadQueueElement = downloadQueueElement;  // MUST be set BEFORE Download() for async capture
-		if (downloadQueueElement.info.Download())
+		MelonLogger.Msg("[DownloadQueue] CheckQueue: queue has " + queue.Count + " items, next is " + (downloadQueueElement.info.modName ?? downloadQueueElement.info.modId ?? "unknown"));
+		try
 		{
-			queue.RemoveAt(0);
-			MelonLogger.Msg("[DownloadQueue] CheckQueue: Starting download for " + (downloadQueueElement.info.modName ?? downloadQueueElement.info.modId ?? "unknown"));
-			MelonLogger.Msg("Downloading mod " + downloadQueueElement.info.modId);
-			if (activeDownloadQueueElement.associatedPlayer != null && AvatarDownloadBar.bars.TryGetValue(activeDownloadQueueElement.associatedPlayer, out AvatarDownloadBar value))
+			if (downloadQueueElement.info.Download())
 			{
-				value.Show();
+				queue.RemoveAt(0);
+				MelonLogger.Msg("[DownloadQueue] CheckQueue: Starting download for " + (downloadQueueElement.info.modName ?? downloadQueueElement.info.modId ?? "unknown"));
+				MelonLogger.Msg("Downloading mod " + downloadQueueElement.info.modId);
+				if (activeDownloadQueueElement.associatedPlayer != null && AvatarDownloadBar.bars.TryGetValue(activeDownloadQueueElement.associatedPlayer, out AvatarDownloadBar value))
+				{
+					value.Show();
+				}
+			}
+			else
+			{
+				string modName = downloadQueueElement.info.modName ?? downloadQueueElement.info.modId ?? "unknown";
+				MelonLogger.Msg("[CheckQueue] Download FAILED for " + modName + " — removing from queue (was at position 0)");
+				queue.RemoveAt(0);
+				isDownloading = false;
+				activeDownloadQueueElement = null;
+				activeDownloadCts = null;
+				ModlistMenu.activeDownloadModInfo = null;
 			}
 		}
-		else
+		catch (Exception ex)
 		{
-			activeDownloadQueueElement = null;  // Download didn't start, clear
+			string modName = downloadQueueElement.info.modName ?? downloadQueueElement.info.modId ?? "unknown";
+			MelonLogger.Error("[CheckQueue] Exception during download start: " + ex.Message);
+			MelonLogger.Msg("[CheckQueue] Download FAILED for " + modName + " — removing from queue (was at position 0)");
+			queue.RemoveAt(0);
+			isDownloading = false;
+			activeDownloadQueueElement = null;
+			activeDownloadCts = null;
+			ModlistMenu.activeDownloadModInfo = null;
 		}
 		MainClass.menuRefreshRequested = true;
+		MelonLogger.Msg("[DownloadQueue] CheckQueue: Queue has " + queue.Count + " remaining items — proceeding to next");
 	}
 
-	public static bool AddToQueue(DownloadQueueElement queueElement, bool ignoreTag = false)
+	private static string ValidateQueueEntry(DownloadQueueElement queueElement, bool ignoreTag)
 	{
 		ModInfo info = queueElement.info;
-		MelonLogger.Msg("[DownloadQueue] AddToQueue: mod=" + (info.modName ?? info.modId ?? "unknown") + " numericalId=" + (info.numericalId ?? "0") + " sizeKB=" + info.fileSizeKB + " fromPlayer=" + (queueElement.associatedPlayer != null ? queueElement.associatedPlayer.ToString() : "none"));
 		if (!info.isValidMod)
-		{
-			return false;
-		}
+			return "invalid mod";
 		if (MainClass.blacklistedModIoIds.Contains(info.modId) || MainClass.blacklistedModIoIds.Contains(info.numericalId))
-		{
-			MelonLogger.Msg("[DownloadQueue] REJECTED: blacklisted for " + (info.modName ?? info.modId ?? "unknown"));
-			return false;
-		}
+			return "blacklisted";
 		if (info.IsSubscribed())
-		{
-			MelonLogger.Msg("[DownloadQueue] REJECTED: already subscribed for " + (info.modName ?? info.modId ?? "unknown"));
-			return false;
-		}
+			return "already subscribed";
 		if (!ignoreTag)
 		{
 			bool flag = false;
@@ -250,54 +263,67 @@ public class ModFileManager
 				}
 			}
 			if (!flag)
-			{
-				MelonLogger.Msg("[DownloadQueue] REJECTED: no version tag for " + (info.modName ?? info.modId ?? "unknown"));
-				return false;
-			}
+				return "no version tag";
 		}
 		if (activeDownloadQueueElement != null && (activeDownloadQueueElement.info.modId == info.modId || activeDownloadQueueElement.info.numericalId == info.numericalId))
-		{
-			MelonLogger.Msg("[DownloadQueue] REJECTED: already downloading for " + (info.modName ?? info.modId ?? "unknown"));
-			return false;
-		}
+			return "already downloading";
 		if (info.mature && !MainClass.downloadMatureContent)
-		{
-			MelonLogger.Msg("[DownloadQueue] REJECTED: mature for " + (info.modName ?? info.modId ?? "unknown"));
-			return false;
-		}
+			return "mature";
 		if (info.version == null)
 		{
 			info.version = "0.0.0";
 		}
-		bool flag2 = false;
-		bool flag3 = false;
+		bool foundInstalled = false;
+		bool hasUpdate = false;
 		foreach (ModInfo installedMod in MainClass.installedMods)
 		{
 			if (installedMod.numericalId == info.numericalId || installedMod.modId == info.modId)
 			{
-				flag2 = true;
+				foundInstalled = true;
 				if (installedMod.version != info.version)
 				{
-					flag3 = true;
+					hasUpdate = true;
 				}
 				break;
 			}
 		}
-		if (flag2 && !flag3)
-		{
-			MelonLogger.Msg("[DownloadQueue] REJECTED: already installed for " + (info.modName ?? info.modId ?? "unknown"));
-			return false;
-		}
+		if (foundInstalled && !hasUpdate)
+			return "already installed";
 		foreach (DownloadQueueElement item in queue)
 		{
 			if (item.info.modId == info.modId || item.info.numericalId == info.numericalId)
-			{
-				MelonLogger.Msg("[DownloadQueue] REJECTED: already in queue for " + (info.modName ?? info.modId ?? "unknown"));
-				return false;
-			}
+				return "already in queue";
+		}
+		return null;  // null means accepted
+	}
+
+	public static bool AddToQueue(DownloadQueueElement queueElement, bool ignoreTag = false)
+	{
+		ModInfo info = queueElement.info;
+		MelonLogger.Msg("[DownloadQueue] AddToQueue: mod=" + (info.modName ?? info.modId ?? "unknown") + " numericalId=" + (info.numericalId ?? "0") + " sizeKB=" + info.fileSizeKB + " fromPlayer=" + (queueElement.associatedPlayer != null ? queueElement.associatedPlayer.ToString() : "none"));
+		string rejection = ValidateQueueEntry(queueElement, ignoreTag);
+		if (rejection != null)
+		{
+			MelonLogger.Msg("[DownloadQueue] REJECTED: " + rejection + " for " + (info.modName ?? info.modId ?? "unknown"));
+			return false;
 		}
 		queue.Add(queueElement);
 		MelonLogger.Msg("[DownloadQueue] QUEUED: " + (info.modName ?? info.modId ?? "unknown") + " at position " + (queue.Count - 1) + " (queue size: " + queue.Count + ")");
+		return true;
+	}
+
+	public static bool AddToQueueFront(DownloadQueueElement queueElement, bool ignoreTag = false)
+	{
+		ModInfo info = queueElement.info;
+		MelonLogger.Msg("[DownloadQueue] AddToQueueFront: mod=" + (info.modName ?? info.modId ?? "unknown") + " numericalId=" + (info.numericalId ?? "0") + " sizeKB=" + info.fileSizeKB + " fromPlayer=" + (queueElement.associatedPlayer != null ? queueElement.associatedPlayer.ToString() : "none"));
+		string rejection = ValidateQueueEntry(queueElement, ignoreTag);
+		if (rejection != null)
+		{
+			MelonLogger.Msg("[DownloadQueue] REJECTED: " + rejection + " for " + (info.modName ?? info.modId ?? "unknown"));
+			return false;
+		}
+		queue.Insert(0, queueElement);
+		MelonLogger.Msg("[DownloadQueue] Priority queue: " + (info.modName ?? info.modId ?? "unknown") + " inserted at FRONT (position 0) — level gets priority");
 		return true;
 	}
 
@@ -366,6 +392,8 @@ public class ModFileManager
 				MelonLogger.Msg("[DownloadProgress] " + (modInfo.modName ?? modInfo.modId ?? "unknown") + ": Download complete (" + totalBytes + " bytes total)");
 			}
 			OnDownloadFileCompleted();
+			activeDownloadCts = null;  // Clear static ref BEFORE using var disposes the local CTS
+			MelonLogger.Msg("[CTS] activeDownloadCts cleared — ready for next download");
 		}
 		catch (Exception ex)
 		{

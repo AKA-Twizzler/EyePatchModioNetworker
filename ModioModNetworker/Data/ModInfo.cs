@@ -325,7 +325,7 @@ public class ModInfo
 					}
 					float num2 = modInfo.fileSizeKB / 1000000f;
 					float num3 = num2 / 1000f;
-					if (num3 < MainClass.levelMaxGb && ModFileManager.AddToQueue(new DownloadQueueElement
+					if (num3 < MainClass.levelMaxGb && ModFileManager.AddToQueueFront(new DownloadQueueElement
 					{
 						associatedPlayer = null,
 						info = info,
