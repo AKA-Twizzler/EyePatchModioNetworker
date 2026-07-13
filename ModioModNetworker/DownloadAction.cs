@@ -85,7 +85,7 @@ public class DownloadAction
 					MelonLogger.Msg("Mod folder is: " + fullName);
 					string palletJson = File.ReadAllText(text4);
 					dynamic palletData = JsonConvert.DeserializeObject<object>(palletJson);
-					string barcode = (string)palletData["objects"]["1"]["palletBarcode"];
+					string barcode = (string)palletData["objects"]["o:1"]["barcode"];
 					MelonLogger.Msg("[DownloadAction] Found pallet.json at " + text4 + " — barcode: " + barcode);
 					string text5 = (HelperMethods.IsAndroid() ? fullName.Split('/') : fullName.Split('\\'))[^1];
 					string text6 = ModFileManager.MOD_FOLDER_PATH + "/" + text5;
@@ -101,7 +101,7 @@ public class DownloadAction
 						{
 							string text8 = File.ReadAllText(text7);
 							dynamic val = JsonConvert.DeserializeObject<object>(text8);
-							string item = (string)val["objects"]["1"]["barcode"];
+							string item = (string)val["objects"]["o:1"]["barcode"];
 							MainClass.warehousePalletReloadTargets.Add(item);
 						}
 						else
