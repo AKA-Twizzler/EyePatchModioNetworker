@@ -220,8 +220,20 @@ public class ModFileManager
 			else
 			{
 				string modName = downloadQueueElement.info.modName ?? downloadQueueElement.info.modId ?? "unknown";
-				MelonLogger.Msg("[CheckQueue] Download FAILED for " + modName + " — removing from queue (was at position 0)");
-				queue.RemoveAt(0);
+
+				if (downloadQueueElement.retryCount < DownloadQueueElement.MAX_RETRIES)
+				{
+					downloadQueueElement.retryCount++;
+					queue.RemoveAt(0);
+					queue.Add(downloadQueueElement);
+					MelonLogger.Msg("[DownloadQueue] Retry " + downloadQueueElement.retryCount + "/" + DownloadQueueElement.MAX_RETRIES + " for " + modName + " — moved to end of queue (queue size: " + queue.Count + ")");
+				}
+				else
+				{
+					queue.RemoveAt(0);
+					MelonLogger.Msg("[DownloadQueue] Dropping " + modName + " after " + (downloadQueueElement.retryCount + 1) + " failed attempts");
+				}
+
 				isDownloading = false;
 				activeDownloadQueueElement = null;
 				activeDownloadCts = null;
@@ -232,8 +244,20 @@ public class ModFileManager
 		{
 			string modName = downloadQueueElement.info.modName ?? downloadQueueElement.info.modId ?? "unknown";
 			MelonLogger.Error("[CheckQueue] Exception during download start: " + ex.Message);
-			MelonLogger.Msg("[CheckQueue] Download FAILED for " + modName + " — removing from queue (was at position 0)");
-			queue.RemoveAt(0);
+
+			if (downloadQueueElement.retryCount < DownloadQueueElement.MAX_RETRIES)
+			{
+				downloadQueueElement.retryCount++;
+				queue.RemoveAt(0);
+				queue.Add(downloadQueueElement);
+				MelonLogger.Msg("[DownloadQueue] Retry " + downloadQueueElement.retryCount + "/" + DownloadQueueElement.MAX_RETRIES + " for " + modName + " — moved to end of queue (queue size: " + queue.Count + ")");
+			}
+			else
+			{
+				queue.RemoveAt(0);
+				MelonLogger.Msg("[DownloadQueue] Dropping " + modName + " after " + (downloadQueueElement.retryCount + 1) + " failed attempts");
+			}
+
 			isDownloading = false;
 			activeDownloadQueueElement = null;
 			activeDownloadCts = null;

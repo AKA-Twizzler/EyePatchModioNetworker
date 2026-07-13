@@ -10,4 +10,7 @@ public class DownloadQueueElement
 	public bool notify = true;
 
 	public bool lobby = false;
+
+	public int retryCount = 0;
+	public const int MAX_RETRIES = 2;
 }
