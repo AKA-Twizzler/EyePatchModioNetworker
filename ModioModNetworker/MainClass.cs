@@ -79,6 +79,8 @@ public class MainClass : MelonMod
 
 	private static int desiredSubs = 0;
 
+	private static List<string> previousSubscribedIds = new List<string>();
+
 	private bool addedCallback = false;
 
 	public static MelonPreferences_Category melonPreferencesCategory;
@@ -791,6 +793,14 @@ public class MainClass : MelonMod
 			MelonLogger.Msg("Total subscriptions: " + num2);
 			subTotal = num2;
 			desiredSubs = 0;
+			// First page — snapshot original subscriptions and clear lists for fresh rebuild
+			previousSubscribedIds = new List<string>(subscribedModIoNumericalIds);
+			if (previousSubscribedIds.Count > 0)
+				MelonLogger.Msg("[Subscription] Captured " + previousSubscribedIds.Count + " previous subscriptions — will compute diff after full rebuild");
+			else
+				MelonLogger.Msg("[Subscription] No previous subscriptions to diff against");
+			subscribedMods.Clear();
+			subscribedModIoNumericalIds.Clear();
 		}
 		int num3 = (int)val["result_count"];
 		if (num3 == 0)
@@ -801,13 +811,6 @@ public class MainClass : MelonMod
 			MelonLogger.Warning("[Subscription] State reset — no subscription data returned from API");
 			return;
 		}
-		// API confirmed data — safe to clear old lists
-		// Snapshot old subscriptions before clearing
-		List<string> previousSubscribedIds = new List<string>(subscribedModIoNumericalIds);
-		MelonLogger.Msg("[Subscription] Captured " + previousSubscribedIds.Count + " previous subscriptions — will compute diff after rebuild");
-
-		subscribedMods.Clear();
-		subscribedModIoNumericalIds.Clear();
 		foreach (dynamic item in val["data"])
 		{
 			if ((int)item["game_id"] == 3809)
@@ -884,30 +887,6 @@ public class MainClass : MelonMod
 			ReceiveSubModInfo(modInfo);
 		}
 
-		// DIFF: Find mods that were subscribed before but aren't anymore → auto-uninstall
-		List<string> newSubscribedIds = new List<string>(subscribedModIoNumericalIds);
-		List<string> removedIds = new List<string>();
-		foreach (string oldId in previousSubscribedIds)
-		{
-			if (!newSubscribedIds.Contains(oldId))
-			{
-				removedIds.Add(oldId);
-			}
-		}
-		if (removedIds.Count > 0)
-		{
-			MelonLogger.Msg("[Subscription] Found " + removedIds.Count + " mods that were unsubscribed — auto-uninstalling");
-			foreach (string removedId in removedIds)
-			{
-				MelonLogger.Msg("[Subscription] Auto-uninstalling unsubscribed mod numericalId=" + removedId);
-				ModFileManager.UnInstallMainThread(removedId);
-			}
-		}
-		else
-		{
-			MelonLogger.Msg("[Subscription] No mods were unsubscribed since last refresh — no auto-uninstall needed");
-		}
-
 		subsShown += num3;
 		if (subTotal - subsShown > 0)
 		{
@@ -915,6 +894,29 @@ public class MainClass : MelonMod
 		}
 		if (subsShown >= subTotal)
 		{
+			// All pages fetched — now compute the diff against the original snapshot
+			List<string> newSubscribedIds = new List<string>(subscribedModIoNumericalIds);
+			List<string> removedIds = new List<string>();
+			foreach (string oldId in previousSubscribedIds)
+			{
+				if (!newSubscribedIds.Contains(oldId))
+				{
+					removedIds.Add(oldId);
+				}
+			}
+			if (removedIds.Count > 0)
+			{
+				MelonLogger.Msg("[Subscription] Found " + removedIds.Count + " mods that were unsubscribed — auto-uninstalling");
+				foreach (string removedId in removedIds)
+				{
+					MelonLogger.Msg("[Subscription] Auto-uninstalling unsubscribed mod numericalId=" + removedId);
+					ModFileManager.UnInstallMainThread(removedId);
+				}
+			}
+			else
+			{
+				MelonLogger.Msg("[Subscription] No mods were unsubscribed since last refresh — no auto-uninstall needed");
+			}
 			subsRefreshing = true;
 		}
 	}
