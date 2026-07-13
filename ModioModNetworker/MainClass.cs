@@ -1107,6 +1107,33 @@ public class MainClass : MelonMod
 					InstalledModInfos.Add(item);
 				}
 				
+				// Check if modinfo.json has empty tags (independent of enrichment)
+				string modFolderPath2 = text.EndsWith(".manifest")
+					? text.Substring(0, text.Length - ".manifest".Length)
+					: "";
+				string modInfoCheckPath = System.IO.Path.Combine(modFolderPath2, "modinfo.json");
+				if (File.Exists(modInfoCheckPath))
+				{
+					try
+					{
+						string modInfoCheckJson = File.ReadAllText(modInfoCheckPath);
+						ModInfo modInfoFromFile = JsonConvert.DeserializeObject<ModInfo>(modInfoCheckJson, new JsonSerializerSettings
+						{
+							MissingMemberHandling = MissingMemberHandling.Ignore,
+							Error = (sender, args) => args.ErrorContext.Handled = true
+						});
+						if (modInfoFromFile != null && modInfoFromFile.tags != null && modInfoFromFile.tags.Count == 0 && !string.IsNullOrEmpty(modInfoFromFile.numericalId))
+						{
+							MelonLogger.Msg("[TagFix] Tags empty for " + Path.GetFileName(text) + " (" + modInfoFromFile.numericalId + ") — scheduling async API fetch");
+							FetchTagsAndUpdateModInfo(modInfoCheckPath, modInfoFromFile.numericalId);
+						}
+					}
+					catch (Exception)
+					{
+						// Silently handle - don't block mod loading
+					}
+				}
+				
 				if (needsEnrichment)
 				{
 					MelonLogger.Msg("[ManifestEnrichment] Manifest " + Path.GetFileName(text) + " needs enrichment: " + enrichReason);
