@@ -114,7 +114,7 @@ public class ModlistMessage : ModuleMessageHandler
 				if (matureRejected2) MelonLogger.Msg("[ModlistMessage] SPAWNABLE " + modName2 + " mature — downloadMatureContent=false");
 				if (alreadySubscribed2) MelonLogger.Msg("[ModlistMessage] SPAWNABLE " + modName2 + " already subscribed — skipping auto-download");
 				if (alreadyDownloaded2) MelonLogger.Msg("[ModlistMessage] SPAWNABLE " + modName2 + " already downloaded this session");
-				if (MainClass.autoDownloadSpawnables && num3 < MainClass.maxAutoDownloadMb && (MainClass.downloadMatureContent || !modInfo.mature) && !modInfo.IsSubscribed() && !MainClass.modNumericalsDownloadedDuringLobbySession.Contains(modInfo.numericalId))
+				if (MainClass.autoDownloadSpawnables && num3 < MainClass.maxAutoDownloadMb && (MainClass.downloadMatureContent || !modInfo.mature) && !MainClass.modNumericalsDownloadedDuringLobbySession.Contains(modInfo.numericalId))
 				{
 					if (MainClass.tempLobbyMods)
 					{
